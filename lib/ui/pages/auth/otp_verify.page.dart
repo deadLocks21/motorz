@@ -35,6 +35,13 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(authErrorMessage(e.code))));
       }
+    } catch (_) {
+      // Toute erreur inattendue (ex. persistance de session) doit être visible
+      // plutôt que de laisser l'utilisateur bloqué sans retour.
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(authErrorMessage(AuthErrorCode.unknown))));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

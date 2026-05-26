@@ -232,7 +232,7 @@ final class SessionRepositoryProvider
   }
 }
 
-String _$sessionRepositoryHash() => r'28adf2023f6b44c2485f818dff5c52c15c3bc598';
+String _$sessionRepositoryHash() => r'd6f0d5ec5b5d487d69c780add3298417e874c810';
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();

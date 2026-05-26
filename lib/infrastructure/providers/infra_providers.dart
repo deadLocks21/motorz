@@ -74,8 +74,17 @@ ConnectivityService connectivityService(Ref ref) {
 Stream<bool> connectivityStatus(Ref ref) => ref.watch(connectivityServiceProvider).watch();
 
 @Riverpod(keepAlive: true)
-SessionRepository sessionRepository(Ref ref) =>
-    kIsWeb ? InMemorySessionRepository() : SecureStorageSessionRepository();
+SessionRepository sessionRepository(Ref ref) {
+  // Local-only (web ou mode memory) : aucune dépendance à un keychain natif, la
+  // session vit en mémoire. Sinon l'auth de démo (code `000000`) échouerait
+  // silencieusement quand `flutter_secure_storage` est indisponible sur la
+  // plateforme (cf. macOS `errSecMissingEntitlement`) — `verifyOtp` lèverait
+  // une erreur non-`AuthException` que la page OTP n'attrape pas.
+  if (kIsWeb || isMemoryMode(ref.watch(apiBaseUrlProvider))) {
+    return InMemorySessionRepository();
+  }
+  return SecureStorageSessionRepository();
+}
 
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) {
