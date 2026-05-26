@@ -1,0 +1,36 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  Motorz — app mobile + desktop de suivi de l'historique de véhicules (auto ET
+  deux-roues) : pleins/conso, entretien, pression pneus, backlog d'échéances
+  km/temps, documents, TCO, stats, devis comparatifs. Inspiration LubeLog, mais
+  natif et joli. Monnaie : EUR uniquement.
+
+  Stack front (CE dépôt) : Flutter / Dart. Archi hexagonale layer-first
+  (core/domain, core/application, infrastructure, ui). Riverpod 3 + codegen
+  (riverpod_annotation / riverpod_generator), modèles écrits à la main (pas de
+  freezed), go_router, dio. Offline-first impératif : store local sqflite + repo
+  décorateur + file FIFO + service de sync sur reconnexion ; sync delta global
+  sur /sync, conflits en last-write-wins par updated_at, suppressions par
+  tombstone. Imports absolus, InMemory* en test.
+
+  Back (dépôt api séparé) : TypeScript + Bun + Hono + Drizzle + zod + Postgres.
+  Auth : comptes individuels, OTP/JWT (httpsms), partage de véhicule par code
+  permanent (pas de rôles).
+
+  Identité « Motorsport » : graphite #15171C + orange signal #FF5A1F, typo
+  Archivo, mode clair ET sombre (tokens AppColors).
+
+  Conventions : conventional commits en français, commits directs sur main.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
