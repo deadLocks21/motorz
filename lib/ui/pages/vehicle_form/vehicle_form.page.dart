@@ -1,0 +1,252 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:motorz/core/domain/model/enums.dart';
+import 'package:motorz/core/domain/model/uuid_value.dart';
+import 'package:motorz/core/domain/model/vehicle.dart';
+import 'package:motorz/infrastructure/providers/repository_providers.dart';
+import 'package:motorz/infrastructure/providers/session_providers.dart';
+
+/// Création (ou édition) d'un véhicule. La saisie est locale-first : le
+/// véhicule apparaît immédiatement, le code de partage arrive à la synchro.
+class VehicleFormPage extends ConsumerStatefulWidget {
+  const VehicleFormPage({super.key, this.existing});
+
+  final Vehicle? existing;
+
+  @override
+  ConsumerState<VehicleFormPage> createState() => _VehicleFormPageState();
+}
+
+class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
+  late final TextEditingController _nickname;
+  late final TextEditingController _make;
+  late final TextEditingController _model;
+  late final TextEditingController _year;
+  late final TextEditingController _trim;
+  late final TextEditingController _plate;
+  late final TextEditingController _vin;
+  late final TextEditingController _engineCc;
+  late final TextEditingController _powerHp;
+  late final TextEditingController _color;
+  late VehicleType _type;
+  FuelType? _fuelType;
+  DateTime? _firstReg;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.existing;
+    _nickname = TextEditingController(text: v?.nickname ?? '');
+    _make = TextEditingController(text: v?.make ?? '');
+    _model = TextEditingController(text: v?.model ?? '');
+    _year = TextEditingController(text: v?.year?.toString() ?? '');
+    _trim = TextEditingController(text: v?.trim ?? '');
+    _plate = TextEditingController(text: v?.licensePlate ?? '');
+    _vin = TextEditingController(text: v?.vin ?? '');
+    _engineCc = TextEditingController(text: v?.engineCc?.toString() ?? '');
+    _powerHp = TextEditingController(text: v?.powerHp?.toString() ?? '');
+    _color = TextEditingController(text: v?.color ?? '');
+    _type = v?.type ?? VehicleType.voiture;
+    _fuelType = v?.fuelType;
+    _firstReg = v?.firstRegistrationDate != null ? DateTime.tryParse(v!.firstRegistrationDate!) : null;
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_nickname, _make, _model, _year, _trim, _plate, _vin, _engineCc, _powerHp, _color]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final nickname = _nickname.text.trim();
+    if (nickname.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Donne un surnom au véhicule.')));
+      return;
+    }
+    final session = ref.read(currentSessionProvider);
+    if (session == null) return;
+
+    setState(() => _saving = true);
+    final base = widget.existing;
+    final vehicle = Vehicle(
+      id: base?.id ?? UuidValue.generate(),
+      ownerUserId: base?.ownerUserId ?? session.user.id,
+      shareCode: base?.shareCode,
+      type: _type,
+      nickname: nickname,
+      make: _emptyToNull(_make.text),
+      model: _emptyToNull(_model.text),
+      year: int.tryParse(_year.text),
+      trim: _emptyToNull(_trim.text),
+      vin: _emptyToNull(_vin.text),
+      licensePlate: _emptyToNull(_plate.text),
+      fuelType: _fuelType,
+      engineCc: int.tryParse(_engineCc.text),
+      powerHp: int.tryParse(_powerHp.text),
+      color: _emptyToNull(_color.text),
+      firstRegistrationDate: _firstReg?.toIso8601String().substring(0, 10),
+      photoMediaId: base?.photoMediaId,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await ref.read(vehicleRepositoryProvider).save(vehicle);
+    if (mounted) context.pop();
+  }
+
+  String? _emptyToNull(String s) => s.trim().isEmpty ? null : s.trim();
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.existing != null;
+    return Scaffold(
+      appBar: AppBar(title: Text(editing ? 'Modifier le véhicule' : 'Nouveau véhicule')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            key: const Key('nicknameField'),
+            controller: _nickname,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Surnom *', hintText: 'La 308'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<VehicleType>(
+            initialValue: _type,
+            decoration: const InputDecoration(labelText: 'Type'),
+            items: VehicleType.values
+                .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                .toList(),
+            onChanged: (v) => setState(() => _type = v ?? VehicleType.voiture),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _make,
+                  decoration: const InputDecoration(labelText: 'Marque'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _model,
+                  decoration: const InputDecoration(labelText: 'Modèle'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _year,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(labelText: 'Année'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _plate,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(labelText: 'Plaque'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<FuelType?>(
+            initialValue: _fuelType,
+            decoration: const InputDecoration(labelText: 'Carburant'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('—')),
+              ...FuelType.values.map((f) => DropdownMenuItem(value: f, child: Text(f.label))),
+            ],
+            onChanged: (v) => setState(() => _fuelType = v),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _engineCc,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(labelText: 'Cylindrée', suffixText: 'cm³'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _powerHp,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(labelText: 'Puissance', suffixText: 'ch'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _trim,
+                  decoration: const InputDecoration(labelText: 'Finition'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _color,
+                  decoration: const InputDecoration(labelText: 'Couleur'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _vin,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(labelText: 'VIN (n° de série)'),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _firstReg ?? now,
+                firstDate: DateTime(1950),
+                lastDate: now,
+              );
+              if (picked != null) setState(() => _firstReg = picked);
+            },
+            child: InputDecorator(
+              decoration: const InputDecoration(labelText: '1ʳᵉ mise en circulation'),
+              child: Text(
+                _firstReg == null
+                    ? 'Choisir une date'
+                    : '${_firstReg!.day}/${_firstReg!.month}/${_firstReg!.year}',
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            key: const Key('saveVehicleButton'),
+            onPressed: _saving ? null : _save,
+            child: Text(editing ? 'Enregistrer' : 'Ajouter au garage'),
+          ),
+        ],
+      ),
+    );
+  }
+}
