@@ -7,7 +7,8 @@ import 'package:motorz/ui/pages/auth/auth_error_message.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/widgets/motorz_wordmark.widget.dart';
 
-/// Saisie du numéro de téléphone → demande d'OTP (self-service).
+/// Saisie du numéro de téléphone → demande d'OTP (connexion d'un compte
+/// existant ; pas d'inscription, les comptes sont créés côté serveur).
 class PhoneEntryPage extends ConsumerStatefulWidget {
   const PhoneEntryPage({super.key});
 
@@ -76,8 +77,7 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'On t\'envoie un code par SMS. Si tu n\'as pas de compte, '
-                    'il est créé automatiquement.',
+                    'On t\'envoie un code par SMS pour te connecter à ton compte.',
                     style: TextStyle(color: colors.textMuted, fontSize: 13),
                   ),
                   const SizedBox(height: 24),

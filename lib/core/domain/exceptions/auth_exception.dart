@@ -1,5 +1,5 @@
 enum AuthErrorCode {
-  registrationRequired,
+  accountNotFound,
   invalidOtp,
   otpExpired,
   invalidPhone,

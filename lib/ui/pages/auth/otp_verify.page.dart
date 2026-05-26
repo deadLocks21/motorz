@@ -7,8 +7,7 @@ import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/ui/pages/auth/auth_error_message.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 
-/// Vérification de l'OTP. Sur compte inconnu, la session passe à `Registering`
-/// (le router redirige vers l'inscription).
+/// Vérification de l'OTP : authentifie le compte associé au numéro.
 class OtpVerifyPage extends ConsumerStatefulWidget {
   const OtpVerifyPage({super.key});
 

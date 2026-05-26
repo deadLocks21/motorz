@@ -13,16 +13,13 @@ class DioAuthRepository implements AuthRepository {
   DioAuthRepository(this._dio);
 
   @override
-  Future<OtpRequestResult> requestOtp(PhoneNumber phone) async {
+  Future<DateTime> requestOtp(PhoneNumber phone) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/auth/request-otp',
         data: {'phone_number': phone.e164},
       );
-      return OtpRequestResult(
-        expiresAt: DateTime.parse(res.data!['expires_at'] as String),
-        isNewUser: res.data!['is_new_user'] as bool,
-      );
+      return DateTime.parse(res.data!['expires_at'] as String);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -33,8 +30,6 @@ class DioAuthRepository implements AuthRepository {
     required PhoneNumber phone,
     required String code,
     required Device device,
-    String? firstName,
-    String? lastName,
   }) async {
     try {
       final data = <String, dynamic>{
@@ -43,8 +38,6 @@ class DioAuthRepository implements AuthRepository {
         'device_id': device.id,
       };
       if (device.name != null) data['device_name'] = device.name;
-      if (firstName != null) data['first_name'] = firstName;
-      if (lastName != null) data['last_name'] = lastName;
       final res = await _dio.post<Map<String, dynamic>>('/auth/verify-otp', data: data);
       return _sessionFromJson(res.data!);
     } on DioException catch (e) {
@@ -75,7 +68,7 @@ class DioAuthRepository implements AuthRepository {
     }
     final code = readErrorCode(e.response);
     return switch (code) {
-      'registration_required' => const AuthException(AuthErrorCode.registrationRequired),
+      'account_not_found' => const AuthException(AuthErrorCode.accountNotFound),
       'invalid_otp' => const AuthException(AuthErrorCode.invalidOtp),
       'otp_expired' => const AuthException(AuthErrorCode.otpExpired),
       'invalid_phone_format' => const AuthException(AuthErrorCode.invalidPhone),

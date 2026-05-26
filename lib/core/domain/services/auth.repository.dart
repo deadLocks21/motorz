@@ -2,26 +2,18 @@ import 'package:motorz/core/domain/model/device.dart';
 import 'package:motorz/core/domain/model/phone_number.dart';
 import 'package:motorz/core/domain/model/session.dart';
 
-/// Résultat de `requestOtp` : échéance du code + si le téléphone est inconnu
-/// (parcours d'inscription self-service).
-class OtpRequestResult {
-  final DateTime expiresAt;
-  final bool isNewUser;
-  const OtpRequestResult({required this.expiresAt, required this.isNewUser});
-}
-
-/// Port d'authentification OTP/SMS. Les erreurs sont signalées via
-/// [AuthException].
+/// Port d'authentification OTP/SMS. Pas d'inscription : les comptes sont
+/// provisionnés côté serveur. Les erreurs sont signalées via [AuthException]
+/// (`accountNotFound` si le numéro n'a pas de compte).
 abstract interface class AuthRepository {
-  Future<OtpRequestResult> requestOtp(PhoneNumber phone);
+  /// Demande un OTP pour un compte existant ; renvoie l'échéance du code.
+  /// Lève `AuthException(accountNotFound)` si le numéro est inconnu.
+  Future<DateTime> requestOtp(PhoneNumber phone);
 
-  /// Vérifie l'OTP. Si le compte n'existe pas, `firstName`/`lastName` sont
-  /// requis (sinon `AuthException(registrationRequired)`).
+  /// Vérifie l'OTP et ouvre une session pour le compte associé au numéro.
   Future<Session> verifyOtp({
     required PhoneNumber phone,
     required String code,
     required Device device,
-    String? firstName,
-    String? lastName,
   });
 }

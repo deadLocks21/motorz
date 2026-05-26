@@ -15,7 +15,8 @@ class SessionController extends _$SessionController {
   @override
   SessionState build() => const Anonymous();
 
-  /// Demande un OTP. Lève [AuthException] en cas d'échec.
+  /// Demande un OTP. Lève [AuthException] en cas d'échec (dont `accountNotFound`
+  /// si le numéro n'a pas de compte — l'inscription n'existe pas côté app).
   Future<void> requestOtp(String rawPhone) async {
     final PhoneNumber phone;
     try {
@@ -23,43 +24,19 @@ class SessionController extends _$SessionController {
     } on FormatException {
       throw const AuthException(AuthErrorCode.invalidPhone);
     }
-    final result = await ref.read(authRepositoryProvider).requestOtp(phone);
-    state = OtpRequested(phone: phone, expiresAt: result.expiresAt, isNewUser: result.isNewUser);
+    final expiresAt = await ref.read(authRepositoryProvider).requestOtp(phone);
+    state = OtpRequested(phone: phone, expiresAt: expiresAt);
   }
 
-  /// Vérifie l'OTP. Si le compte est inconnu, passe à [Registering]
-  /// (collecte prénom/nom) ; sinon authentifie. Lève [AuthException] sinon.
+  /// Vérifie l'OTP et authentifie le compte associé. Lève [AuthException] sinon.
   Future<void> verifyOtp(String code) async {
     final current = state;
     if (current is! OtpRequested) return;
     final device = await ref.read(sessionRepositoryProvider).readOrCreateDevice();
-    try {
-      final session = await ref.read(authRepositoryProvider).verifyOtp(
-            phone: current.phone,
-            code: code,
-            device: device,
-          );
-      await _authenticate(session);
-    } on AuthException catch (e) {
-      if (e.code == AuthErrorCode.registrationRequired) {
-        state = Registering(phone: current.phone, code: code);
-        return;
-      }
-      rethrow;
-    }
-  }
-
-  /// Termine l'inscription avec prénom + nom.
-  Future<void> completeRegistration(String firstName, String lastName) async {
-    final current = state;
-    if (current is! Registering) return;
-    final device = await ref.read(sessionRepositoryProvider).readOrCreateDevice();
     final session = await ref.read(authRepositoryProvider).verifyOtp(
           phone: current.phone,
-          code: current.code,
+          code: code,
           device: device,
-          firstName: firstName,
-          lastName: lastName,
         );
     await _authenticate(session);
   }

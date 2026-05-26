@@ -6,17 +6,13 @@ import 'package:motorz/core/domain/model/user.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/services/auth.repository.dart';
 
-/// Auth factice (dev/web/tests) : code `000000`, inscription si prénom fourni.
+/// Auth factice pour le mode local-only (dev/web/tests) : pas de backend ni de
+/// provisioning, donc tout numéro se connecte avec le code `000000` et ouvre
+/// une session de démo. L'inscription self-service n'existe pas côté app.
 class InMemoryAuthRepository implements AuthRepository {
-  final Set<String> _knownPhones;
-  InMemoryAuthRepository({Set<String>? knownPhones}) : _knownPhones = knownPhones ?? {};
-
   @override
-  Future<OtpRequestResult> requestOtp(PhoneNumber phone) async {
-    return OtpRequestResult(
-      expiresAt: DateTime.now().add(const Duration(minutes: 5)),
-      isNewUser: !_knownPhones.contains(phone.e164),
-    );
+  Future<DateTime> requestOtp(PhoneNumber phone) async {
+    return DateTime.now().add(const Duration(minutes: 5));
   }
 
   @override
@@ -24,21 +20,14 @@ class InMemoryAuthRepository implements AuthRepository {
     required PhoneNumber phone,
     required String code,
     required Device device,
-    String? firstName,
-    String? lastName,
   }) async {
     if (code != '000000') throw const AuthException(AuthErrorCode.invalidOtp);
-    final isNew = !_knownPhones.contains(phone.e164);
-    if (isNew && (firstName == null || lastName == null)) {
-      throw const AuthException(AuthErrorCode.registrationRequired);
-    }
-    _knownPhones.add(phone.e164);
     return Session(
       jwt: 'dev.jwt.token',
       user: User(
         id: UuidValue.generate(),
-        firstName: firstName ?? 'Dev',
-        lastName: lastName ?? 'User',
+        firstName: 'Dev',
+        lastName: 'User',
         phoneNumber: phone.e164,
       ),
       device: device,
