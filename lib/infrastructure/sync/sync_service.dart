@@ -49,6 +49,24 @@ class SyncService {
     });
   }
 
+  /// Réinitialise l'état local et le repeuple depuis le serveur, pris comme
+  /// **source de vérité** : vide la file en attente, le store local et le
+  /// curseur de synchro, puis tire tout l'état serveur (pull complet).
+  ///
+  /// Appelé au login pour repartir propre (changement de compte, écritures
+  /// optimistes obsolètes, store hérité d'une session précédente). No-op en
+  /// mode local-only : le store local y est l'unique source, rien à rapatrier.
+  Future<void> resetToRemote() async {
+    if (!enabled || _disposed) return;
+    await _lock.synchronized(() async {
+      await _queue.clear();
+      await _cursor.clear();
+      await _store.clear();
+    });
+    _logger?.info('sync.reset');
+    await syncNow();
+  }
+
   /// Push (drain de la file) puis pull (delta). Best-effort : une erreur réseau
   /// laisse la file intacte et sera réessayée au prochain passage en ligne.
   Future<void> syncNow() async {

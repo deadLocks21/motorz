@@ -64,7 +64,9 @@ class SessionController extends _$SessionController {
     ref.read(loggerProvider).info('auth.login');
     final sync = ref.read(syncServiceProvider);
     sync.start();
-    unawaited(sync.syncNow());
+    // Au login, on repart de la vérité serveur : on vide l'état local (store +
+    // file + curseur) avant de tout rapatrier. No-op en mode local-only.
+    unawaited(sync.resetToRemote());
   }
 
   /// Restaure une session persistée au démarrage.
