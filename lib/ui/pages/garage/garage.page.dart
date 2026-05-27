@@ -53,6 +53,7 @@ class GaragePage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => ref.read(syncServiceProvider).syncNow(),
         child: vehiclesAsync.when(
+          skipLoadingOnReload: true, // save/sync → reload : garde la liste, pas de flash spinner
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Erreur : $e')),
           data: (vehicles) {

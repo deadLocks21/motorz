@@ -35,6 +35,15 @@ class VehicleDetailPage extends ConsumerWidget {
     final vehicleAsync = ref.watch(vehicleByIdProvider(vehicleId));
 
     return vehicleAsync.when(
+      // Chaque save réinvalide les providers store → reload. Sans ceci, `.when`
+      // rejoue `loading` (défaut skipLoadingOnReload=false), ce qui détruit
+      // _VehicleDetailView et recrée son TabController → l'onglet repart sur
+      // « Vue d'ensemble ». On garde l'écran monté avec les données précédentes.
+      // Chaque save réinvalide les providers store → reload. Sans ceci, `.when`
+      // rejoue `loading` (défaut skipLoadingOnReload=false), ce qui détruit
+      // _VehicleDetailView et recrée son TabController → l'onglet repart sur
+      // « Vue d'ensemble ». On garde l'écran monté avec les données précédentes.
+      skipLoadingOnReload: true,
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Erreur : $e'))),
       data: (vehicle) {
@@ -370,6 +379,7 @@ class _FuelTab extends ConsumerWidget {
     final colors = context.appColors;
     final fuelAsync = ref.watch(fuelEntriesProvider(vehicleId));
     return fuelAsync.when(
+      skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (entries) {
@@ -403,6 +413,7 @@ class _MaintenanceTab extends ConsumerWidget {
     final colors = context.appColors;
     final async = ref.watch(maintenanceEventsProvider(vehicleId));
     return async.when(
+      skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (events) {
@@ -440,6 +451,7 @@ class _TasksTab extends ConsumerWidget {
     final colors = context.appColors;
     final async = ref.watch(dueTasksProvider(vehicleId));
     return async.when(
+      skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (items) {
@@ -520,6 +532,7 @@ class _TiresTab extends ConsumerWidget {
         reference == null ? null : (pos.startsWith('AV') ? reference.front : reference.rear);
 
     return entriesAsync.when(
+      skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (entries) {

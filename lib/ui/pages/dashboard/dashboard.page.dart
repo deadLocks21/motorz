@@ -17,6 +17,7 @@ class DashboardPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Tableau de bord')),
       body: vehiclesAsync.when(
+        skipLoadingOnReload: true, // save → reload : garde le contenu, pas de flash spinner
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erreur : $e')),
         data: (vehicles) {
