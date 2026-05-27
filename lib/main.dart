@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/logger_application.service.dart';
 import 'package:motorz/core/domain/model/app_theme_mode.dart';
@@ -89,6 +90,20 @@ void _installErrorHandlers(LoggerApplicationService logger) {
   };
 }
 
+/// Locale unique de l'app : français (France). Force notamment les
+/// date pickers en français, avec le lundi comme premier jour de semaine.
+const _appLocale = Locale('fr', 'FR');
+
+/// Délégués Material/Widgets/Cupertino traduits, fournis par
+/// `flutter_localizations`. Sans eux, Flutter retombe sur l'anglais.
+const _localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+const _supportedLocales = <Locale>[_appLocale];
+
 class MotorzApp extends ConsumerStatefulWidget {
   const MotorzApp({super.key});
 
@@ -140,6 +155,9 @@ class _MotorzAppState extends ConsumerState<MotorzApp> with WidgetsBindingObserv
         theme: light,
         darkTheme: dark,
         themeMode: ThemeMode.system,
+        locale: _appLocale,
+        localizationsDelegates: _localizationsDelegates,
+        supportedLocales: _supportedLocales,
         debugShowCheckedModeBanner: false,
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
@@ -147,6 +165,9 @@ class _MotorzAppState extends ConsumerState<MotorzApp> with WidgetsBindingObserv
         title: 'Motorz',
         theme: light,
         darkTheme: dark,
+        locale: _appLocale,
+        localizationsDelegates: _localizationsDelegates,
+        supportedLocales: _supportedLocales,
         debugShowCheckedModeBanner: false,
         home: Scaffold(body: Center(child: Text('Erreur de démarrage : $e'))),
       ),
@@ -155,6 +176,9 @@ class _MotorzAppState extends ConsumerState<MotorzApp> with WidgetsBindingObserv
         theme: light,
         darkTheme: dark,
         themeMode: AppThemeData.toFlutterThemeMode(themeMode),
+        locale: _appLocale,
+        localizationsDelegates: _localizationsDelegates,
+        supportedLocales: _supportedLocales,
         debugShowCheckedModeBanner: false,
         routerConfig: ref.watch(goRouterProvider),
       ),
