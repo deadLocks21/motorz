@@ -370,6 +370,56 @@ final class PendingQueueProvider
 
 String _$pendingQueueHash() => r'ae16510e08c59d266f3edc1da2db2096b26cde21';
 
+/// Dead-letter des écritures refusées en push — impl mémoire par défaut,
+/// **surchargée** par l'impl sqflite dans `main()` sur mobile/desktop.
+
+@ProviderFor(rejectedOpStore)
+final rejectedOpStoreProvider = RejectedOpStoreProvider._();
+
+/// Dead-letter des écritures refusées en push — impl mémoire par défaut,
+/// **surchargée** par l'impl sqflite dans `main()` sur mobile/desktop.
+
+final class RejectedOpStoreProvider
+    extends
+        $FunctionalProvider<RejectedOpStore, RejectedOpStore, RejectedOpStore>
+    with $Provider<RejectedOpStore> {
+  /// Dead-letter des écritures refusées en push — impl mémoire par défaut,
+  /// **surchargée** par l'impl sqflite dans `main()` sur mobile/desktop.
+  RejectedOpStoreProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'rejectedOpStoreProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$rejectedOpStoreHash();
+
+  @$internal
+  @override
+  $ProviderElement<RejectedOpStore> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  RejectedOpStore create(Ref ref) {
+    return rejectedOpStore(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RejectedOpStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RejectedOpStore>(value),
+    );
+  }
+}
+
+String _$rejectedOpStoreHash() => r'448e7790401fc8ee501971f162e1978d7d066e23';
+
 @ProviderFor(syncCursor)
 final syncCursorProvider = SyncCursorProvider._();
 
@@ -579,7 +629,50 @@ final class SyncServiceProvider
   }
 }
 
-String _$syncServiceHash() => r'ba687c0ca3efe052dde1d772a8ac95025422b93b';
+String _$syncServiceHash() => r'50e23bf817151ffaa96789393c8c19ba8a215e8d';
+
+/// État de synchro observable par l'UI (phase, ops en attente, rejets).
+
+@ProviderFor(syncStatus)
+final syncStatusProvider = SyncStatusProvider._();
+
+/// État de synchro observable par l'UI (phase, ops en attente, rejets).
+
+final class SyncStatusProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SyncStatus>,
+          SyncStatus,
+          Stream<SyncStatus>
+        >
+    with $FutureModifier<SyncStatus>, $StreamProvider<SyncStatus> {
+  /// État de synchro observable par l'UI (phase, ops en attente, rejets).
+  SyncStatusProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'syncStatusProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$syncStatusHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<SyncStatus> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<SyncStatus> create(Ref ref) {
+    return syncStatus(ref);
+  }
+}
+
+String _$syncStatusHash() => r'a6325f5b98a5bdd828942244f348bd98f2ebf343';
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
 /// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :

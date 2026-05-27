@@ -18,10 +18,11 @@ class _FakeSyncApi extends SyncApi {
   final bool throwOnPush;
 
   @override
-  Future<void> push(Map<String, List<Map<String, dynamic>>> changes) async {
+  Future<PushResult> push(Map<String, List<Map<String, dynamic>>> changes) async {
     if (throwOnPush) {
       throw DioException(requestOptions: RequestOptions(path: '/sync/push'));
     }
+    return const PushResult(rejected: []);
   }
 
   @override

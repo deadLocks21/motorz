@@ -25,8 +25,9 @@ class _FakeSyncApi extends SyncApi {
   }
 
   @override
-  Future<void> push(Map<String, List<Map<String, dynamic>>> changes) async {
+  Future<PushResult> push(Map<String, List<Map<String, dynamic>>> changes) async {
     pushed.add(changes);
+    return const PushResult(rejected: []);
   }
 }
 

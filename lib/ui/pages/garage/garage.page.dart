@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/infrastructure/sync/sync_service.dart';
 import 'package:motorz/ui/pages/dashboard/dashboard.page.dart';
+import 'package:motorz/ui/pages/garage/widgets/sync_status_action.widget.dart';
 import 'package:motorz/ui/pages/garage/widgets/vehicle_card.widget.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/router/app_router.dart';
@@ -22,11 +24,30 @@ class GaragePage extends ConsumerWidget {
     final online = ref.watch(connectivityStatusProvider).value ?? true;
     final myId = session?.user.id.value;
 
+    // Alerte transitoire : nouvelle saisie refusée, ou synchro en échec réseau.
+    // On ignore la 1ʳᵉ émission (prev null) pour ne pas spammer au démarrage.
+    ref.listen(syncStatusProvider, (prev, next) {
+      final p = prev?.value;
+      final n = next.value;
+      if (p == null || n == null) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (n.rejected > p.rejected) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Des saisies n\'ont pas pu être synchronisées.'),
+        ));
+      } else if (n.phase == SyncPhase.error && p.phase != SyncPhase.error) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Échec de synchronisation — nouvelle tentative au retour du réseau.'),
+        ));
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
         title: const MotorzWordmark(fontSize: 24),
         actions: [
+          const SyncStatusAction(),
           IconButton(
             tooltip: 'Tableau de bord',
             icon: const Icon(Icons.insights_outlined),
