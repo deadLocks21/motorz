@@ -10,7 +10,7 @@ import 'package:motorz/infrastructure/auth/in_memory_auth_repository.dart';
 import 'package:motorz/infrastructure/connectivity/connectivity_plus.service.dart';
 import 'package:motorz/infrastructure/http/auth_interceptor.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
-import 'package:motorz/infrastructure/session/secure_storage_session_repository.dart';
+import 'package:motorz/infrastructure/session/shared_prefs_session_repository.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
 import 'package:motorz/infrastructure/sync/sync_api.dart';
@@ -75,15 +75,13 @@ Stream<bool> connectivityStatus(Ref ref) => ref.watch(connectivityServiceProvide
 
 @Riverpod(keepAlive: true)
 SessionRepository sessionRepository(Ref ref) {
-  // Local-only (web ou mode memory) : aucune dépendance à un keychain natif, la
-  // session vit en mémoire. Sinon l'auth de démo (code `000000`) échouerait
-  // silencieusement quand `flutter_secure_storage` est indisponible sur la
-  // plateforme (cf. macOS `errSecMissingEntitlement`) — `verifyOtp` lèverait
-  // une erreur non-`AuthException` que la page OTP n'attrape pas.
+  // Web ou mode démo (memory) : pas de backend réel, la session est jetable et
+  // vit en mémoire. Sinon, persistance locale via `shared_preferences`
+  // (stockage non chiffré — cf. SharedPreferencesSessionRepository).
   if (kIsWeb || isMemoryMode(ref.watch(apiBaseUrlProvider))) {
     return InMemorySessionRepository();
   }
-  return SecureStorageSessionRepository();
+  return SharedPreferencesSessionRepository();
 }
 
 @Riverpod(keepAlive: true)

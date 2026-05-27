@@ -1,7 +1,7 @@
 import 'package:motorz/core/domain/model/device.dart';
 import 'package:motorz/core/domain/model/user.dart';
 
-/// Session authentifiée persistée (`flutter_secure_storage`).
+/// Session authentifiée persistée (`shared_preferences`).
 class Session {
   final String jwt;
   final User user;

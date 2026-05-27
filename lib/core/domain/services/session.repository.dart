@@ -1,7 +1,7 @@
 import 'package:motorz/core/domain/model/device.dart';
 import 'package:motorz/core/domain/model/session.dart';
 
-/// Persistance de la session (JWT + user + device) — `flutter_secure_storage`.
+/// Persistance de la session (JWT + user + device) — `shared_preferences`.
 abstract interface class SessionRepository {
   Future<Session?> read();
   Future<void> write(Session session);

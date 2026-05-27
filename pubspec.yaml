@@ -33,7 +33,6 @@ dependencies:
 
   # Préférences & session
   shared_preferences: ^2.5.4
-  flutter_secure_storage: ^10.0.0
 
   # Divers
   uuid: ^4.5.1
