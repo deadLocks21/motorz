@@ -9,6 +9,7 @@ import 'package:motorz/infrastructure/auth/dio_auth_repository.dart';
 import 'package:motorz/infrastructure/auth/in_memory_auth_repository.dart';
 import 'package:motorz/infrastructure/connectivity/connectivity_plus.service.dart';
 import 'package:motorz/infrastructure/http/auth_interceptor.dart';
+import 'package:motorz/infrastructure/providers/logger_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/session/shared_prefs_session_repository.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
@@ -106,10 +107,12 @@ SyncCursorStore syncCursor(Ref ref) =>
 SyncApi syncApi(Ref ref) => SyncApi(ref.watch(dioProvider));
 
 @Riverpod(keepAlive: true)
-VehicleRemoteApi vehicleRemoteApi(Ref ref) => VehicleRemoteApi(ref.watch(dioProvider));
+VehicleRemoteApi vehicleRemoteApi(Ref ref) =>
+    VehicleRemoteApi(ref.watch(dioProvider), logger: ref.watch(loggerProvider));
 
 @Riverpod(keepAlive: true)
-MediaRemoteApi mediaRemoteApi(Ref ref) => MediaRemoteApi(ref.watch(dioProvider));
+MediaRemoteApi mediaRemoteApi(Ref ref) =>
+    MediaRemoteApi(ref.watch(dioProvider), logger: ref.watch(loggerProvider));
 
 @Riverpod(keepAlive: true)
 SyncService syncService(Ref ref) {
@@ -120,6 +123,7 @@ SyncService syncService(Ref ref) {
     queue: ref.watch(pendingQueueProvider),
     connectivity: ref.watch(connectivityServiceProvider),
     cursor: ref.watch(syncCursorProvider),
+    logger: ref.watch(loggerProvider),
     enabled: !isMemoryMode(baseUrl),
   );
   ref.onDispose(service.dispose);

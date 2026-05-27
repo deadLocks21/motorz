@@ -232,7 +232,7 @@ final class SessionRepositoryProvider
   }
 }
 
-String _$sessionRepositoryHash() => r'd6f0d5ec5b5d487d69c780add3298417e874c810';
+String _$sessionRepositoryHash() => r'edaa9b2ebe526e793d01990ac568c7ef2c086620';
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();
@@ -497,7 +497,7 @@ final class VehicleRemoteApiProvider
   }
 }
 
-String _$vehicleRemoteApiHash() => r'596b0126901398f27344cae584ddac43c771db9b';
+String _$vehicleRemoteApiHash() => r'2d0ab1289a011d10d5cc0f7d95a6b6866263c08f';
 
 @ProviderFor(mediaRemoteApi)
 final mediaRemoteApiProvider = MediaRemoteApiProvider._();
@@ -538,7 +538,7 @@ final class MediaRemoteApiProvider
   }
 }
 
-String _$mediaRemoteApiHash() => r'f35f88b9ef4d6bd4dc6f7df5f9bdde09cd456a8f';
+String _$mediaRemoteApiHash() => r'b591a7f2b668b4ab6abddf515c8871fa444b51c0';
 
 @ProviderFor(syncService)
 final syncServiceProvider = SyncServiceProvider._();
@@ -579,7 +579,7 @@ final class SyncServiceProvider
   }
 }
 
-String _$syncServiceHash() => r'ec19b96b4a0ac4d7a2279d956d74ced49ce02d8e';
+String _$syncServiceHash() => r'ba687c0ca3efe052dde1d772a8ac95025422b93b';
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
 

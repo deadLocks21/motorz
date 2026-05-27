@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
+import 'package:motorz/core/application/services/logger_application.service.dart';
 import 'package:motorz/core/domain/services/connectivity.service.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
@@ -17,6 +17,7 @@ class SyncService {
   final PendingQueue _queue;
   final ConnectivityService _connectivity;
   final SyncCursorStore _cursor;
+  final LoggerApplicationService? _logger;
 
   /// `false` en mode local-only (pas de backend configuré) : la synchro est
   /// neutralisée, le store local reste pleinement fonctionnel.
@@ -32,12 +33,14 @@ class SyncService {
     required PendingQueue queue,
     required ConnectivityService connectivity,
     required SyncCursorStore cursor,
+    LoggerApplicationService? logger,
     this.enabled = true,
   })  : _api = api,
         _store = store,
         _queue = queue,
         _connectivity = connectivity,
-        _cursor = cursor;
+        _cursor = cursor,
+        _logger = logger;
 
   void start() {
     if (!enabled || _subscription != null || _disposed) return;
@@ -51,18 +54,30 @@ class SyncService {
   Future<void> syncNow() async {
     if (!enabled || _disposed || !_connectivity.isOnline) return;
     await _lock.synchronized(() async {
+      final sw = Stopwatch()..start();
       try {
-        await _push();
-        await _pull();
+        final pushed = await _push();
+        final pulled = await _pull();
+        // On ne logge que les synchros « utiles » : un drain à vide à chaque
+        // bascule réseau ne doit pas inonder Signoz.
+        if (pushed > 0 || pulled > 0) {
+          _logger?.info('sync.completed', attrs: {
+            'sync.pushed': pushed,
+            'sync.pulled': pulled,
+            'sync.duration_ms': sw.elapsedMilliseconds,
+          });
+        }
       } catch (e, st) {
-        developer.log('sync failed — will retry', name: 'motorz.sync', level: 800, error: e, stackTrace: st);
+        // Best-effort : la file reste intacte, réessai au prochain passage en ligne.
+        _logger?.error('sync.failed', error: e, stack: st);
       }
     });
   }
 
-  Future<void> _push() async {
+  /// Draine la file (push). Renvoie le nombre d'opérations poussées.
+  Future<int> _push() async {
     final ops = await _queue.readAll();
-    if (ops.isEmpty) return;
+    if (ops.isEmpty) return 0;
     final changes = <String, List<Map<String, dynamic>>>{};
     for (final op in ops) {
       changes.putIfAbsent(op.resource, () => []).add(op.data);
@@ -71,15 +86,20 @@ class SyncService {
     for (final op in ops) {
       await _queue.remove(op.resource, op.entityId);
     }
+    return ops.length;
   }
 
-  Future<void> _pull() async {
+  /// Tire les changements delta. Renvoie le nombre de lignes appliquées au store.
+  Future<int> _pull() async {
     final since = await _cursor.read();
     final result = await _api.pull(since);
+    var count = 0;
     for (final entry in result.changes.entries) {
       await _store.upsertAll(entry.key, entry.value);
+      count += entry.value.length;
     }
     await _cursor.write(result.serverTime);
+    return count;
   }
 
   Future<void> dispose() async {

@@ -44,7 +44,7 @@ final class SessionControllerProvider
   }
 }
 
-String _$sessionControllerHash() => r'd8e15e6297989aadf8f427892d5cbf85a15b75af';
+String _$sessionControllerHash() => r'715ab7334538d09f87479dea85f4f57ee818878a';
 
 /// Pilote la machine d'états [SessionState] (cf. redirect go_router).
 
@@ -148,4 +148,4 @@ final class BootstrapProvider
   }
 }
 
-String _$bootstrapHash() => r'45a855807c5a59e112c855a9399d7f6d094c3cb1';
+String _$bootstrapHash() => r'776b831776f32c42c445bc447e7d71c6bc6ab8c1';
