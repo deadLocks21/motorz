@@ -25,6 +25,10 @@ abstract interface class LocalRecordStore {
 
   Future<Map<String, dynamic>?> getById(String resource, String id);
 
+  /// Vide entièrement le store (toutes ressources). Utilisé au login pour
+  /// repartir de la vérité serveur (cf. `SyncService.resetToRemote`).
+  Future<void> clear();
+
   /// Émet un **numéro de révision monotone** à chaque écriture — l'UI s'y
   /// abonne pour se rafraîchir. Le compteur (et non `void`) est volontaire :
   /// Riverpod dé-doublonne les états `AsyncData` égaux (`updateShouldNotify`
@@ -83,6 +87,12 @@ class InMemoryLocalRecordStore implements LocalRecordStore {
   @override
   Future<Map<String, dynamic>?> getById(String resource, String id) async =>
       _bucket(resource)[id];
+
+  @override
+  Future<void> clear() async {
+    _data.clear();
+    _changes.add(++_revision);
+  }
 }
 
 // ── Impl sqflite (mobile/desktop) ───────────────────────────────────────────
@@ -177,5 +187,11 @@ class SqfliteLocalRecordStore implements LocalRecordStore {
     );
     if (rows.isEmpty) return null;
     return jsonDecode(rows.first['data'] as String) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<void> clear() async {
+    await _lock.synchronized(() async => _db.delete(table));
+    _changes.add(++_revision);
   }
 }

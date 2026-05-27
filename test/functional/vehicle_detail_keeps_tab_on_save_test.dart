@@ -27,6 +27,8 @@ class _LatentStore implements LocalRecordStore {
   Future<void> put(String r, Map<String, dynamic> row) => _inner.put(r, row);
   @override
   Future<void> upsertAll(String r, List<Map<String, dynamic>> rows) => _inner.upsertAll(r, rows);
+  @override
+  Future<void> clear() => _inner.clear();
 
   @override
   Future<Map<String, dynamic>?> getById(String r, String id) async {
