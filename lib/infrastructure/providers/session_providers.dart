@@ -6,6 +6,7 @@ import 'package:motorz/core/domain/model/phone_number.dart';
 import 'package:motorz/core/domain/model/session.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/logger_providers.dart';
+import 'package:motorz/infrastructure/seed/demo_seed.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'session_providers.g.dart';
@@ -94,6 +95,11 @@ Session? currentSession(Ref ref) {
 @Riverpod(keepAlive: true)
 Future<void> bootstrap(Ref ref) async {
   await ref.read(apiBaseUrlProvider.notifier).load();
+  // Mode démo (local-only) : garnit le garage d'un véhicule d'exemple au
+  // premier lancement (idempotent), pour ne pas s'ouvrir sur un écran vide.
+  if (isMemoryMode(ref.read(apiBaseUrlProvider))) {
+    await DemoSeed(ref.read(localRecordStoreProvider)).ensureSeeded();
+  }
   await ref.read(sessionControllerProvider.notifier).restore();
   final sync = ref.read(syncServiceProvider);
   sync.start();
