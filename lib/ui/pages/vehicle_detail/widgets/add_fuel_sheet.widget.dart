@@ -9,7 +9,20 @@ import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
 
+/// Représentation compacte d'un nombre pour pré-remplir un champ de saisie :
+/// sépare en virgule (locale FR) et sans zéros décimaux superflus. On garde la
+/// précision telle quelle (ex. prix 1,859 €/L) — `_num` reparse les deux séparateurs.
+String _fmtInput(double v) {
+  var s = v.toString();
+  if (s.endsWith('.0')) s = s.substring(0, s.length - 2);
+  return s.replaceAll('.', ',');
+}
+
 /// Feuille modale de saisie rapide d'un plein (chemin critique §6.2).
+///
+/// Passe [existing] pour rouvrir la feuille en mode édition : les champs sont
+/// pré-remplis et l'enregistrement met à jour l'entrée (même id) au lieu d'en
+/// créer une nouvelle.
 Future<void> showAddFuelSheet(
   BuildContext context,
   WidgetRef ref, {
@@ -17,6 +30,7 @@ Future<void> showAddFuelSheet(
   int? lastOdometer,
   FuelType? defaultFuelType,
   FuelEntry? duplicateOf,
+  FuelEntry? existing,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -27,6 +41,7 @@ Future<void> showAddFuelSheet(
       lastOdometer: lastOdometer,
       defaultFuelType: defaultFuelType,
       duplicateOf: duplicateOf,
+      existing: existing,
     ),
   );
 }
@@ -37,6 +52,7 @@ class _AddFuelSheet extends ConsumerStatefulWidget {
     this.lastOdometer,
     this.defaultFuelType,
     this.duplicateOf,
+    this.existing,
   });
 
   final String vehicleId;
@@ -46,6 +62,9 @@ class _AddFuelSheet extends ConsumerStatefulWidget {
   /// Pré-remplit la station « comme la dernière fois » (§5.8) ; le volume et le
   /// prix changent à chaque plein, on les laisse à saisir.
   final FuelEntry? duplicateOf;
+
+  /// Plein à modifier (mode édition). Null → création d'un nouveau plein.
+  final FuelEntry? existing;
 
   @override
   ConsumerState<_AddFuelSheet> createState() => _AddFuelSheetState();
@@ -67,10 +86,23 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
   @override
   void initState() {
     super.initState();
-    _odo = TextEditingController(text: widget.lastOdometer?.toString() ?? '');
-    // On garde uniquement la station de la dernière fois ; volume et prix se
-    // tapent à chaque plein.
-    if (widget.duplicateOf?.station != null) _station.text = widget.duplicateOf!.station!;
+    final ex = widget.existing;
+    _odo = TextEditingController(text: (ex?.odometer ?? widget.lastOdometer)?.toString() ?? '');
+    if (ex != null) {
+      // Mode édition : on repart de toutes les valeurs de l'entrée.
+      _date = ex.date.toLocal();
+      if (ex.volumeLiters != null) _volume.text = _fmtInput(ex.volumeLiters!);
+      if (ex.pricePerLiter != null) _price.text = _fmtInput(ex.pricePerLiter!);
+      if (ex.station != null) _station.text = ex.station!;
+    } else if (widget.duplicateOf?.station != null) {
+      // On garde uniquement la station de la dernière fois ; volume et prix se
+      // tapent à chaque plein.
+      _station.text = widget.duplicateOf!.station!;
+    }
+    // Total initial (mode édition) — calcul direct, setState interdit ici.
+    final v0 = _num(_volume.text);
+    final p0 = _num(_price.text);
+    if (v0 != null && p0 != null) _total = v0 * p0;
     _volume.addListener(_recompute);
     _price.addListener(_recompute);
   }
@@ -87,7 +119,9 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
       context: context,
       initialDate: _date,
       firstDate: DateTime(now.year - 5),
-      lastDate: now,
+      // Fin de journée : autorise aujourd'hui quelle que soit l'heure, et évite
+      // qu'en édition une date stockée à midi ne dépasse `lastDate` avant midi.
+      lastDate: DateTime(now.year, now.month, now.day, 23, 59, 59),
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -112,16 +146,21 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     final price = _num(_price.text);
     // Midi local pour éviter qu'un décalage de fuseau ne change le jour saisi.
     final date = DateTime(_date.year, _date.month, _date.day, 12);
+    final ex = widget.existing;
+    // En édition on conserve l'identité (id, véhicule, créateur) et les champs
+    // non éditables ici (type de carburant, notes) ; sinon on génère un plein neuf.
     final entry = FuelEntry(
-      id: UuidValue.generate(),
-      vehicleId: UuidValue.parse(widget.vehicleId),
+      id: ex?.id ?? UuidValue.generate(),
+      vehicleId: ex?.vehicleId ?? UuidValue.parse(widget.vehicleId),
+      createdByUserId: ex?.createdByUserId,
       date: date.toUtc(),
       odometer: odo,
       volumeLiters: volume,
       pricePerLiter: price,
       totalCost: (volume != null && price != null) ? volume * price : null,
-      fuelType: widget.defaultFuelType,
+      fuelType: ex?.fuelType ?? widget.defaultFuelType,
       station: _station.text.trim().isEmpty ? null : _station.text.trim(),
+      notes: ex?.notes,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(fuelRepositoryProvider).save(entry);
@@ -131,13 +170,15 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final isEditing = widget.existing != null;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Nouveau plein', style: Theme.of(context).textTheme.titleLarge),
+          Text(isEditing ? 'Modifier le plein' : 'Nouveau plein',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           InputDecorator(
             decoration: const InputDecoration(labelText: 'Date'),
@@ -200,7 +241,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
           FilledButton(
             key: const Key('saveFuelButton'),
             onPressed: _saving ? null : _save,
-            child: const Text('Enregistrer le plein'),
+            child: Text(isEditing ? 'Enregistrer les modifications' : 'Enregistrer le plein'),
           ),
         ],
       ),

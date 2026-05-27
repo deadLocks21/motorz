@@ -5,6 +5,7 @@ import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/task_templates.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
+import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_task.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
@@ -388,19 +389,80 @@ class _FuelTab extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           itemCount: entries.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (_, i) {
+          itemBuilder: (context, i) {
             final e = entries[i];
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.local_gas_station, color: colors.accent),
-              title: Text('${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}'),
-              subtitle: Text('${formatDate(e.date)}${e.station != null ? ' · ${e.station}' : ''}'),
-              trailing: Text(formatEur(e.totalCost), style: const TextStyle(fontWeight: FontWeight.w700)),
+            // Appui long (tactile) ou clic droit (desktop) → modifier / supprimer.
+            return GestureDetector(
+              onLongPressStart: (d) => _showEntryMenu(context, ref, e, d.globalPosition),
+              onSecondaryTapDown: (d) => _showEntryMenu(context, ref, e, d.globalPosition),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.local_gas_station, color: colors.accent),
+                title: Text('${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}'),
+                subtitle: Text('${formatDate(e.date)}${e.station != null ? ' · ${e.station}' : ''}'),
+                trailing: Text(formatEur(e.totalCost), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
             );
           },
         );
       },
     );
+  }
+
+  /// Menu contextuel positionné au point de contact (doigt ou curseur).
+  Future<void> _showEntryMenu(
+      BuildContext context, WidgetRef ref, FuelEntry entry, Offset position) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(position & const Size(40, 40), Offset.zero & overlay.size),
+      items: const [
+        PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            leading: Icon(Icons.edit_outlined),
+            title: Text('Modifier'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            leading: Icon(Icons.delete_outline),
+            title: Text('Supprimer'),
+          ),
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'edit':
+        await showAddFuelSheet(context, ref, vehicleId: vehicleId, existing: entry);
+      case 'delete':
+        await _confirmDelete(context, ref, entry);
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, FuelEntry entry) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer ce plein ?'),
+        content: Text('${formatDate(entry.date)} · ${formatKm(entry.odometer)}'
+            '${entry.volumeLiters != null ? ' · ${formatLiters(entry.volumeLiters)}' : ''}\n'
+            'Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(fuelRepositoryProvider).delete(entry);
+    }
   }
 }
 
