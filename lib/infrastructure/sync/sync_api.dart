@@ -6,6 +6,23 @@ class PullResult {
   const PullResult({required this.serverTime, required this.changes});
 }
 
+/// Une ligne refusée par `/sync/push` (réponse 2xx, champ `rejected`) :
+/// `forbidden` (cible non autorisée) ou `invalid` (payload invalide). Échec
+/// **permanent** — la rejouer à l'identique serait re-rejetée.
+class RejectedRow {
+  final String resource;
+  final String id;
+  final String reason;
+  const RejectedRow({required this.resource, required this.id, required this.reason});
+}
+
+/// Résultat d'un push : les lignes que le serveur a refusées (les autres sont
+/// appliquées). Une réponse non-2xx lève à la place (échec transitoire).
+class PushResult {
+  final List<RejectedRow> rejected;
+  const PushResult({required this.rejected});
+}
+
 /// Client HTTP des endpoints `/sync` (delta + push).
 class SyncApi {
   final Dio _dio;
@@ -27,9 +44,19 @@ class SyncApi {
   }
 
   /// Pousse un lot de mutations. Lève en cas d'échec réseau/serveur (la file
-  /// est préservée). Sur 2xx, les ops envoyées peuvent être retirées de la file
-  /// (les `rejected` sont des échecs permanents : forbidden/invalid).
-  Future<void> push(Map<String, List<Map<String, dynamic>>> changes) async {
-    await _dio.post<Map<String, dynamic>>('/sync/push', data: {'changes': changes});
+  /// est préservée pour réessai). Sur 2xx, renvoie les lignes refusées
+  /// (`rejected`) — échecs permanents à sortir de la file vers la dead-letter.
+  Future<PushResult> push(Map<String, List<Map<String, dynamic>>> changes) async {
+    final res = await _dio.post<Map<String, dynamic>>('/sync/push', data: {'changes': changes});
+    final raw = (res.data?['rejected'] as List?) ?? const [];
+    final rejected = raw.map((e) {
+      final m = (e as Map).cast<String, dynamic>();
+      return RejectedRow(
+        resource: m['resource'] as String,
+        id: m['id'] as String,
+        reason: m['reason'] as String,
+      );
+    }).toList(growable: false);
+    return PushResult(rejected: rejected);
   }
 }

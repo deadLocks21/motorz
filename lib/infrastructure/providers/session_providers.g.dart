@@ -44,7 +44,7 @@ final class SessionControllerProvider
   }
 }
 
-String _$sessionControllerHash() => r'715ab7334538d09f87479dea85f4f57ee818878a';
+String _$sessionControllerHash() => r'4b698dc99497408d9c6d719f3d32be0e1fb95193';
 
 /// Pilote la machine d'états [SessionState] (cf. redirect go_router).
 

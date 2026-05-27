@@ -14,6 +14,7 @@ import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/session/shared_prefs_session_repository.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
+import 'package:motorz/infrastructure/sync/rejected_op_store.dart';
 import 'package:motorz/infrastructure/sync/sync_api.dart';
 import 'package:motorz/infrastructure/sync/sync_cursor.dart';
 import 'package:motorz/infrastructure/sync/sync_service.dart';
@@ -99,6 +100,11 @@ LocalRecordStore localRecordStore(Ref ref) => InMemoryLocalRecordStore();
 @Riverpod(keepAlive: true)
 PendingQueue pendingQueue(Ref ref) => InMemoryPendingQueue();
 
+/// Dead-letter des écritures refusées en push — impl mémoire par défaut,
+/// **surchargée** par l'impl sqflite dans `main()` sur mobile/desktop.
+@Riverpod(keepAlive: true)
+RejectedOpStore rejectedOpStore(Ref ref) => InMemoryRejectedOpStore();
+
 @Riverpod(keepAlive: true)
 SyncCursorStore syncCursor(Ref ref) =>
     kIsWeb ? InMemorySyncCursorStore() : SharedPrefsSyncCursorStore();
@@ -121,6 +127,7 @@ SyncService syncService(Ref ref) {
     api: ref.watch(syncApiProvider),
     store: ref.watch(localRecordStoreProvider),
     queue: ref.watch(pendingQueueProvider),
+    rejectedStore: ref.watch(rejectedOpStoreProvider),
     connectivity: ref.watch(connectivityServiceProvider),
     cursor: ref.watch(syncCursorProvider),
     logger: ref.watch(loggerProvider),
@@ -129,6 +136,10 @@ SyncService syncService(Ref ref) {
   ref.onDispose(service.dispose);
   return service;
 }
+
+/// État de synchro observable par l'UI (phase, ops en attente, rejets).
+@riverpod
+Stream<SyncStatus> syncStatus(Ref ref) => ref.watch(syncServiceProvider).watchStatus();
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
 /// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :

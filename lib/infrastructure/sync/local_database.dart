@@ -23,10 +23,15 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi, sqfliteFfiInit;
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
+import 'package:motorz/infrastructure/sync/rejected_op_store.dart';
 
 /// Ouvre la base sqflite locale (init FFI sur desktop). Crée les tables
-/// `records` (store) et `pending_ops` (file de synchro). Appelée au démarrage
-/// sur mobile/desktop ; sur web on reste sur les impls mémoire.
+/// `records` (store), `pending_ops` (file de synchro) et `rejected_ops`
+/// (dead-letter). Appelée au démarrage sur mobile/desktop ; sur web on reste
+/// sur les impls mémoire.
+///
+/// v2 : ajout de `rejected_ops` — `onUpgrade` la crée pour les installs
+/// existantes (`CREATE TABLE IF NOT EXISTS`, donc idempotent).
 Future<Database> openMotorzDatabase() async {
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     sqfliteFfiInit();
@@ -36,10 +41,14 @@ Future<Database> openMotorzDatabase() async {
   final path = p.join(dir.path, 'motorz.db');
   return openDatabase(
     path,
-    version: 1,
+    version: 2,
     onCreate: (db, version) async {
       await SqfliteLocalRecordStore.createTable(db);
       await SqflitePendingQueue.createTable(db);
+      await SqfliteRejectedOpStore.createTable(db);
+    },
+    onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 2) await SqfliteRejectedOpStore.createTable(db);
     },
   );
 }

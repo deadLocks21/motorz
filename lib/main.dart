@@ -10,6 +10,7 @@ import 'package:motorz/infrastructure/providers/theme_providers.dart';
 import 'package:motorz/infrastructure/sync/local_database.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
+import 'package:motorz/infrastructure/sync/rejected_op_store.dart';
 import 'package:motorz/ui/router/app_router.dart';
 import 'package:motorz/ui/theme/app_theme_data.dart';
 
@@ -29,6 +30,7 @@ Future<void> main() async {
       container = ProviderContainer(overrides: [
         localRecordStoreProvider.overrideWithValue(SqfliteLocalRecordStore(db)),
         pendingQueueProvider.overrideWithValue(SqflitePendingQueue(db)),
+        rejectedOpStoreProvider.overrideWithValue(SqfliteRejectedOpStore(db)),
       ]);
     } catch (e, st) {
       sqfliteError = e;
