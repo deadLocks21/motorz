@@ -6,12 +6,20 @@ import 'package:motorz/core/domain/model/user.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/services/auth.repository.dart';
 
-/// Auth factice pour le mode local-only (dev/web/tests) : pas de backend ni de
-/// provisioning, donc tout numéro se connecte avec le code `000000` et ouvre
-/// une session de démo. L'inscription self-service n'existe pas côté app.
+/// Auth factice pour le mode local-only (dev/web/tests) : pas de backend, donc
+/// le code OTP est toujours `000000` et la session est une démo. Le mode simule
+/// néanmoins le provisioning serveur : seuls les numéros de [_allowedPhones]
+/// peuvent se connecter ; tout autre numéro est rejeté comme un compte inconnu
+/// (`accountNotFound`), exactement comme le ferait le vrai backend.
 class InMemoryAuthRepository implements AuthRepository {
+  /// Numéros autorisés en mode local-only, en E.164. Ici `06 12 34 56 78`.
+  static const _allowedPhones = {'+33612345678'};
+
   @override
   Future<DateTime> requestOtp(PhoneNumber phone) async {
+    if (!_allowedPhones.contains(phone.e164)) {
+      throw const AuthException(AuthErrorCode.accountNotFound);
+    }
     return DateTime.now().add(const Duration(minutes: 5));
   }
 
@@ -21,6 +29,9 @@ class InMemoryAuthRepository implements AuthRepository {
     required String code,
     required Device device,
   }) async {
+    if (!_allowedPhones.contains(phone.e164)) {
+      throw const AuthException(AuthErrorCode.accountNotFound);
+    }
     if (code != '000000') throw const AuthException(AuthErrorCode.invalidOtp);
     return Session(
       jwt: 'dev.jwt.token',
