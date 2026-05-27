@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/domain/exceptions/auth_exception.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/ui/pages/auth/auth_error_message.dart';
+import 'package:motorz/ui/pages/auth/backend_url_dialog.widget.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/widgets/motorz_wordmark.widget.dart';
 
@@ -30,12 +31,15 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
-      await ref.read(sessionControllerProvider.notifier).requestOtp(_controller.text);
+      await ref
+          .read(sessionControllerProvider.notifier)
+          .requestOtp(_controller.text);
       // La redirection vers l'écran OTP est pilotée par le router.
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(authErrorMessage(e.code))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(authErrorMessage(e.code))));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -47,55 +51,79 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
     final colors = context.appColors;
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(child: MotorzWordmark(fontSize: 52)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Le carnet de bord de tes véhicules.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: colors.textMuted, fontSize: 15),
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Center(child: MotorzWordmark(fontSize: 52)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Le carnet de bord de tes véhicules.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: colors.textMuted, fontSize: 15),
+                      ),
+                      const SizedBox(height: 40),
+                      Text(
+                        'Ton numéro de mobile',
+                        style: TextStyle(color: colors.textMuted),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const Key('phoneField'),
+                        controller: _controller,
+                        keyboardType: TextInputType.phone,
+                        autofocus: true,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9 +]')),
+                        ],
+                        decoration: const InputDecoration(
+                          hintText: '06 12 34 56 78',
+                        ),
+                        onSubmitted: (_) => _submit(),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'On t\'envoie un code par SMS pour te connecter à ton compte.',
+                        style: TextStyle(color: colors.textMuted, fontSize: 13),
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        key: const Key('requestOtpButton'),
+                        onPressed: _loading ? null : _submit,
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Recevoir le code'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 40),
-                  Text('Ton numéro de mobile', style: TextStyle(color: colors.textMuted)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    key: const Key('phoneField'),
-                    controller: _controller,
-                    keyboardType: TextInputType.phone,
-                    autofocus: true,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9 +]'))],
-                    decoration: const InputDecoration(hintText: '06 12 34 56 78'),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'On t\'envoie un code par SMS pour te connecter à ton compte.',
-                    style: TextStyle(color: colors.textMuted, fontSize: 13),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    key: const Key('requestOtpButton'),
-                    onPressed: _loading ? null : _submit,
-                    child: _loading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Recevoir le code'),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                tooltip: 'Configurer le serveur',
+                color: colors.textMuted,
+                onPressed: () => showBackendUrlDialog(context, ref),
+              ),
+            ),
+          ],
         ),
       ),
     );
