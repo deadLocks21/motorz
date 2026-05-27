@@ -131,5 +131,7 @@ SyncService syncService(Ref ref) {
 }
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
+/// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :
+/// indispensable pour que Riverpod renotifie à *chaque* écriture, et pas qu'à la 1ʳᵉ.
 @riverpod
-Stream<void> storeChanges(Ref ref) => ref.watch(localRecordStoreProvider).changes;
+Stream<int> storeChanges(Ref ref) => ref.watch(localRecordStoreProvider).changes;

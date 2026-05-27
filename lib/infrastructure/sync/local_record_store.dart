@@ -25,8 +25,13 @@ abstract interface class LocalRecordStore {
 
   Future<Map<String, dynamic>?> getById(String resource, String id);
 
-  /// Émet à chaque écriture — l'UI s'y abonne pour se rafraîchir.
-  Stream<void> get changes;
+  /// Émet un **numéro de révision monotone** à chaque écriture — l'UI s'y
+  /// abonne pour se rafraîchir. Le compteur (et non `void`) est volontaire :
+  /// Riverpod dé-doublonne les états `AsyncData` égaux (`updateShouldNotify`
+  /// → `prev != next`), donc deux `AsyncData(null)` successifs ne
+  /// renotifieraient PAS les dépendants — seule la 1ʳᵉ écriture rafraîchirait.
+  /// Une valeur qui change à chaque émission garantit le rafraîchissement.
+  Stream<int> get changes;
 }
 
 String? _vehicleIdOf(Map<String, dynamic> row) => row['vehicle_id'] as String?;
@@ -37,10 +42,11 @@ String? _deletedAtOf(Map<String, dynamic> row) => row['deleted_at'] as String?;
 
 class InMemoryLocalRecordStore implements LocalRecordStore {
   final Map<String, Map<String, Map<String, dynamic>>> _data = {};
-  final StreamController<void> _changes = StreamController<void>.broadcast();
+  final StreamController<int> _changes = StreamController<int>.broadcast();
+  int _revision = 0;
 
   @override
-  Stream<void> get changes => _changes.stream;
+  Stream<int> get changes => _changes.stream;
 
   Map<String, Map<String, dynamic>> _bucket(String resource) =>
       _data.putIfAbsent(resource, () => {});
@@ -52,13 +58,13 @@ class InMemoryLocalRecordStore implements LocalRecordStore {
     for (final row in rows) {
       bucket[row['id'] as String] = row;
     }
-    _changes.add(null);
+    _changes.add(++_revision);
   }
 
   @override
   Future<void> put(String resource, Map<String, dynamic> row) async {
     _bucket(resource)[row['id'] as String] = row;
-    _changes.add(null);
+    _changes.add(++_revision);
   }
 
   @override
@@ -83,7 +89,8 @@ class InMemoryLocalRecordStore implements LocalRecordStore {
 
 class SqfliteLocalRecordStore implements LocalRecordStore {
   final Database _db;
-  final StreamController<void> _changes = StreamController<void>.broadcast();
+  final StreamController<int> _changes = StreamController<int>.broadcast();
+  int _revision = 0;
   final Lock _lock = Lock();
 
   SqfliteLocalRecordStore(this._db);
@@ -108,7 +115,7 @@ class SqfliteLocalRecordStore implements LocalRecordStore {
   }
 
   @override
-  Stream<void> get changes => _changes.stream;
+  Stream<int> get changes => _changes.stream;
 
   Future<void> _write(String resource, Iterable<Map<String, dynamic>> rows) async {
     await _lock.synchronized(() async {
@@ -129,7 +136,7 @@ class SqfliteLocalRecordStore implements LocalRecordStore {
       }
       await batch.commit(noResult: true);
     });
-    _changes.add(null);
+    _changes.add(++_revision);
   }
 
   @override

@@ -582,16 +582,22 @@ final class SyncServiceProvider
 String _$syncServiceHash() => r'ba687c0ca3efe052dde1d772a8ac95025422b93b';
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
+/// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :
+/// indispensable pour que Riverpod renotifie à *chaque* écriture, et pas qu'à la 1ʳᵉ.
 
 @ProviderFor(storeChanges)
 final storeChangesProvider = StoreChangesProvider._();
 
 /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
+/// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :
+/// indispensable pour que Riverpod renotifie à *chaque* écriture, et pas qu'à la 1ʳᵉ.
 
 final class StoreChangesProvider
-    extends $FunctionalProvider<AsyncValue<void>, void, Stream<void>>
-    with $FutureModifier<void>, $StreamProvider<void> {
+    extends $FunctionalProvider<AsyncValue<int>, int, Stream<int>>
+    with $FutureModifier<int>, $StreamProvider<int> {
   /// Émet à chaque changement du store local — l'UI s'y abonne pour se rafraîchir.
+  /// Le flux porte un numéro de révision monotone (cf. [LocalRecordStore.changes]) :
+  /// indispensable pour que Riverpod renotifie à *chaque* écriture, et pas qu'à la 1ʳᵉ.
   StoreChangesProvider._()
     : super(
         from: null,
@@ -608,13 +614,13 @@ final class StoreChangesProvider
 
   @$internal
   @override
-  $StreamProviderElement<void> $createElement($ProviderPointer pointer) =>
+  $StreamProviderElement<int> $createElement($ProviderPointer pointer) =>
       $StreamProviderElement(pointer);
 
   @override
-  Stream<void> create(Ref ref) {
+  Stream<int> create(Ref ref) {
     return storeChanges(ref);
   }
 }
 
-String _$storeChangesHash() => r'1f26b75c2894e52b543b6a3a53280e8d90db1fb1';
+String _$storeChangesHash() => r'b513add5175e724332e5117c11dcbf2c1569f7da';
