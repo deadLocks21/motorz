@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Requis en build release/sideload : sans ça l'app n'a aucun accès réseau
+         (en debug/profile, Flutter ajoute INTERNET via un manifest dédié). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Motorz"
         android:name="${applicationName}"
