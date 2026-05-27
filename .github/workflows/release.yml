@@ -10,7 +10,8 @@
 #      build-macos     .pkg signé Mac App Store (artifact, pas encore publié).
 #   3) build-gate      Sentinelle : vérifie que les builds sont verts.
 #   4) publish-android Upload sur le Play Store, piste "internal".
-#      publish-macos   Upload sur TestFlight, groupe interne "Motorz Internal".
+#      publish-macos   Upload sur TestFlight (les testeurs internes du groupe
+#                      "Motorz Internal" reçoivent le build automatiquement).
 #   5) release         Crée la GitHub Release avec l'AAB + le .pkg attachés.
 #
 # AUTRES PLATEFORMES (iOS/App Store, Windows/Linux, Web) : hors pipeline pour
@@ -431,10 +432,14 @@ jobs:
           WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
           PKG_PATH=$(find artifacts -type f -name '*.pkg' | head -1)
           echo "Uploading: $PKG_PATH"
+          # NB : pas de `--beta-group`. "Motorz Internal" est un groupe INTERNE :
+          # l'API App Store Connect refuse l'assignation explicite d'un build à un
+          # groupe interne ("Cannot add internal group to a build"). Les testeurs
+          # internes reçoivent automatiquement tout build traité. `--beta-group`
+          # n'est à utiliser que pour des groupes EXTERNES.
           app-store-connect publish \
             --path "$PKG_PATH" \
             --testflight \
-            --beta-group "Motorz Internal" \
             --expire-build-submitted-for-review \
             --locale fr-FR \
             --whats-new "$WHATS_NEW" \

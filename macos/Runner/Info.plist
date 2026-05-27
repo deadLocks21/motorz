@@ -30,5 +30,11 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- Déclare ne pas utiliser de chiffrement non exempté (au-delà de HTTPS) :
+	     évite le statut MISSING_EXPORT_COMPLIANCE qui bloque la distribution
+	     TestFlight (y compris aux testeurs internes) tant qu'on n'y a pas répondu
+	     manuellement. Passer à <true/> uniquement si chiffrement propriétaire. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
