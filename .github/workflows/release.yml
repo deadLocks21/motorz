@@ -7,12 +7,14 @@
 #
 #   1) prepare         Calcule la version (depuis le tag ou pubspec.yaml).
 #   2) build-android   AAB signé (artifact, pas encore publié).
+#      build-macos     .pkg signé Mac App Store (artifact, pas encore publié).
 #   3) build-gate      Sentinelle : vérifie que les builds sont verts.
 #   4) publish-android Upload sur le Play Store, piste "internal".
-#   5) release         Crée la GitHub Release avec l'AAB attaché.
+#      publish-macos   Upload sur TestFlight, groupe interne "Motorz Internal".
+#   5) release         Crée la GitHub Release avec l'AAB + le .pkg attachés.
 #
-# AUTRES PLATEFORMES (iOS/App Store, macOS/Windows/Linux, Web) : hors pipeline
-# pour l'instant (cf. BRIEF §12 et §13, étape 14 « Élargissement des cibles »).
+# AUTRES PLATEFORMES (iOS/App Store, Windows/Linux, Web) : hors pipeline pour
+# l'instant (cf. BRIEF §12 et §13, étape 14 « Élargissement des cibles »).
 # Le workflow de songbook-app (`../songbook-app/.github/workflows/release.yml`)
 # contient les jobs build/publish prêts à copier — builds parallèles + gate
 # strict + release multi-assets — quand ces cibles seront activées.
@@ -23,12 +25,24 @@
 #   ANDROID_KEY_ALIAS              alias de la clé
 #   ANDROID_KEY_PASSWORD           mot de passe de la clé
 #   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS  JSON du compte de service Google Play
+#   APP_STORE_CONNECT_KEY_IDENTIFIER     Key ID de la clé API App Store Connect
+#   APP_STORE_CONNECT_ISSUER_ID          Issuer ID du compte App Store Connect
+#   APP_STORE_CONNECT_PRIVATE_KEY        contenu du .p8 de la clé API
+#   CERTIFICATE_PRIVATE_KEY              clé privée du cert Apple Distribution
+#   MAC_INSTALLER_CERTIFICATE_P12_BASE64 cert "3rd Party Mac Developer Installer" (.p12 base64)
+#   MAC_INSTALLER_CERTIFICATE_PASSWORD   mot de passe du .p12 installer
 #   SIGNOZ_INGESTION_KEY           clé d'ingestion Signoz (optionnelle — vide =
 #                                  app en ConsoleLogger, pas de remontée Signoz)
+# Les 6 secrets Apple sont account-wide (compte fr.dtfh, déjà utilisés par
+# kidflix/songbook) — recopier les mêmes valeurs, rien à régénérer.
 #
 # Pré-requis Play Console : l'app `fr.dtfh.motorz` doit exister dans la console
 # et un premier AAB peut devoir être uploadé manuellement avant que l'API
 # accepte les publications automatiques sur la piste internal.
+# Pré-requis App Store Connect : app Motorz (Apple ID 6773623419, bundle
+# `fr.dtfh.motorz`, plateforme macOS) créée + groupe TestFlight interne
+# "Motorz Internal". Le provisioning profile Mac App Store est généré
+# automatiquement au premier build par `fetch-signing-files --create`.
 name: Release
 
 on:
@@ -164,14 +178,178 @@ jobs:
           if-no-files-found: error
 
   # ═══════════════════════════════════════════════════════════════════════
+  # BUILD macOS — Compilation + signature + packaging .pkg (pas de publish)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-macos:
+    name: Build macOS (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+      MAC_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_INSTALLER_CERTIFICATE_P12_BASE64 }}
+      MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+      BUNDLE_ID: "fr.dtfh.motorz"
+      APP_STORE_APPLE_ID: "6773623419"
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: flutter config --enable-macos-desktop
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Fetch Mac App Store signing files (create if missing)
+        run: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type MAC_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+
+      - name: Add Mac App Distribution certificate to keychain
+        run: keychain add-certificates
+
+      - name: Add Mac Installer Distribution certificate to keychain
+        # Cert installer account-wide, injecté depuis secret base64 (pas généré
+        # par fetch-signing-files qui ne couvre que les certs liés à un bundle ID).
+        run: |
+          INSTALLER_P12="$RUNNER_TEMP/mac_installer.p12"
+          echo "$MAC_INSTALLER_CERTIFICATE_P12_BASE64" | base64 --decode > "$INSTALLER_P12"
+          keychain add-certificates \
+            -c "$INSTALLER_P12" \
+            --certificate-password=@env:MAC_INSTALLER_CERTIFICATE_PASSWORD
+
+      - name: Verify keychain contents (debug)
+        # 2 identités obligatoires : "Apple Distribution" (signe le .app) +
+        # "3rd Party Mac Developer Installer" (signe le .pkg).
+        run: |
+          security find-identity -v -p basic
+          N=$(security find-identity -v -p basic | tail -1 | grep -oE '[0-9]+' | head -1)
+          if [ "${N:-0}" -lt 2 ]; then
+            echo "ERROR: expected at least 2 identities, got ${N:-0}"
+            exit 1
+          fi
+
+      - name: Set up code signing on macOS Xcode project
+        run: xcode-project use-profiles --project macos/Runner.xcodeproj
+
+      - run: flutter pub get
+
+      - name: Cache CocoaPods (macOS)
+        uses: actions/cache@v4
+        with:
+          path: |
+            macos/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-macos-${{ runner.os }}-${{ hashFiles('macos/Podfile.lock') }}
+          restore-keys: pods-macos-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies (macOS)
+        run: |
+          cd macos
+          pod install
+
+      - name: Compute build number from App Store Connect (macOS)
+        # `--platform MAC_OS` CRUCIAL : build number macOS séparé d'iOS
+        # malgré Universal Purchase.
+        id: build-number
+        run: |
+          LATEST_BUILD=$(app-store-connect get-latest-build-number \
+            "$APP_STORE_APPLE_ID" \
+            --platform MAC_OS)
+          BUILD_NUMBER=$((LATEST_BUILD + 1))
+          echo "Next macOS build number: $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build macOS release
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build macos --release \
+            --build-name="$VERSION" \
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}"
+
+      - name: Package .app into signed .pkg
+        # productbuild (création) + productsign (signature) séparés pour avoir
+        # un message d'erreur précis. `--timestamp=none` évite l'appel
+        # timestamp.apple.com qui peut hang. `< /dev/null` ferme stdin.
+        run: |
+          set -euo pipefail
+
+          APP_PATH=$(find build/macos/Build/Products/Release -maxdepth 1 -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found"
+            ls -la build/macos/Build/Products/Release/ || true
+            exit 1
+          fi
+
+          INSTALLER_IDENTITY=$(security find-identity -v -p basic \
+            | grep "3rd Party Mac Developer Installer" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$INSTALLER_IDENTITY" ]; then
+            echo "ERROR: no installer identity found"
+            security find-identity -v
+            exit 1
+          fi
+
+          PKG_NAME="motorz-${VERSION}-${{ steps.build-number.outputs.build_number }}.pkg"
+          UNSIGNED_PKG="$RUNNER_TEMP/unsigned.pkg"
+
+          productbuild --component "$APP_PATH" /Applications "$UNSIGNED_PKG"
+          productsign \
+            --sign "$INSTALLER_IDENTITY" \
+            --timestamp=none \
+            "$UNSIGNED_PKG" "$PKG_NAME" < /dev/null
+          pkgutil --check-signature "$PKG_NAME"
+          echo "PKG_PATH=$PWD/$PKG_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload .pkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motorz-macos
+          path: ${{ env.PKG_PATH }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════════════════════════════════════
   # BUILD GATE — Sentinelle qui valide que les builds sont verts
   # ═══════════════════════════════════════════════════════════════════════
 
   build-gate:
     name: All builds passed
-    # Une seule plateforme active pour l'instant. Ajouter ici les autres jobs
-    # build-* en activant les cibles desktop/iOS (cf. en-tête du fichier).
-    needs: [build-android]
+    needs: [build-android, build-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -217,13 +395,58 @@ jobs:
             --track internal \
             --release-notes "@file:release_notes_android.json"
 
+  publish-macos:
+    name: Publish macOS to TestFlight
+    needs: [prepare, build-gate]
+    # 120 min de timeout : le processing Apple pour les .pkg macOS est souvent
+    # plus lent que pour les .ipa.
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      APP_STORE_CONNECT_MAX_FIND_BUILD_WAIT: "90"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: motorz-macos
+          path: artifacts/
+
+      - name: Publish to TestFlight (internal beta group, macOS)
+        run: |
+          WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
+          PKG_PATH=$(find artifacts -type f -name '*.pkg' | head -1)
+          echo "Uploading: $PKG_PATH"
+          app-store-connect publish \
+            --path "$PKG_PATH" \
+            --testflight \
+            --beta-group "Motorz Internal" \
+            --expire-build-submitted-for-review \
+            --locale fr-FR \
+            --whats-new "$WHATS_NEW" \
+            --max-find-build-wait 90
+
   # ═══════════════════════════════════════════════════════════════════════
-  # GITHUB RELEASE — AAB attaché, après publish vert
+  # GITHUB RELEASE — AAB + .pkg attachés, après publishes verts
   # ═══════════════════════════════════════════════════════════════════════
 
   release:
     name: Create GitHub Release
-    needs: [prepare, publish-android]
+    needs: [prepare, publish-android, publish-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -250,7 +473,7 @@ jobs:
             [ -n "$f" ] || continue
             echo "  - $f"
             ASSETS+=("$f")
-          done < <(find artifacts -type f -name '*.aab' | sort)
+          done < <(find artifacts -type f \( -name '*.aab' -o -name '*.pkg' \) | sort)
 
           if [ ${#ASSETS[@]} -eq 0 ]; then
             echo "ERROR: no release assets found"
