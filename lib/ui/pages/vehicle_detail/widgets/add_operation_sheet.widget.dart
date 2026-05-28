@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:motorz/core/application/services/catalog_defaults.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
-import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
-import 'package:motorz/infrastructure/providers/session_providers.dart';
-import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) {
@@ -18,8 +13,9 @@ double? _num(String s) {
 }
 
 /// Saisie / édition d'une **opération d'entretien** : un en-tête (date, km,
-/// prestataire, note) + un **panier de lignes** (postes faits). Chaque ligne est
-/// soit un poste du catalogue, soit un libellé libre. Le coût total = Σ lignes.
+/// prestataire, note) + un **panier de lignes** (postes faits, en libellé libre
+/// + coûts). Le coût total = Σ lignes. Une ligne au même intitulé qu'une échéance
+/// la remet à zéro (rapprochement par intitulé, cf. À prévoir).
 Future<void> showAddOperationSheet(
   BuildContext context,
   WidgetRef ref, {
@@ -27,7 +23,6 @@ Future<void> showAddOperationSheet(
   int? lastOdometer,
   Operation? existing,
   List<OperationLine> existingLines = const [],
-  Map<String, CatalogItem> catalogById = const {},
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -38,31 +33,24 @@ Future<void> showAddOperationSheet(
       lastOdometer: lastOdometer,
       existing: existing,
       existingLines: existingLines,
-      catalogById: catalogById,
     ),
   );
 }
 
 /// Brouillon d'une ligne en cours de saisie.
 class _LineDraft {
-  _LineDraft({
-    this.existingId,
-    String name = '',
-    this.freeMode = false,
-    double? parts,
-    double? labor,
-  })  : nameCtrl = TextEditingController(text: name),
+  _LineDraft({this.existingId, String label = '', double? parts, double? labor})
+      : labelCtrl = TextEditingController(text: label),
         partsCtrl = TextEditingController(text: parts?.toString() ?? ''),
         laborCtrl = TextEditingController(text: labor?.toString() ?? '');
 
   final UuidValue? existingId;
-  final TextEditingController nameCtrl;
+  final TextEditingController labelCtrl;
   final TextEditingController partsCtrl;
   final TextEditingController laborCtrl;
-  bool freeMode;
 
   void dispose() {
-    nameCtrl.dispose();
+    labelCtrl.dispose();
     partsCtrl.dispose();
     laborCtrl.dispose();
   }
@@ -74,14 +62,12 @@ class _AddOperationSheet extends ConsumerStatefulWidget {
     this.lastOdometer,
     this.existing,
     this.existingLines = const [],
-    this.catalogById = const {},
   });
 
   final String vehicleId;
   final int? lastOdometer;
   final Operation? existing;
   final List<OperationLine> existingLines;
-  final Map<String, CatalogItem> catalogById;
 
   @override
   ConsumerState<_AddOperationSheet> createState() => _AddOperationSheetState();
@@ -108,14 +94,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     _note = TextEditingController(text: e?.note ?? '');
     _date = e?.date.toLocal() ?? DateTime.now();
     for (final l in widget.existingLines) {
-      final free = l.label != null;
-      _lines.add(_LineDraft(
-        existingId: l.id,
-        name: free ? l.label! : (widget.catalogById[l.catalogItemId!.value]?.name ?? ''),
-        freeMode: free,
-        parts: l.partsCost,
-        labor: l.laborCost,
-      ));
+      _lines.add(_LineDraft(existingId: l.id, label: l.label, parts: l.partsCost, labor: l.laborCost));
     }
     if (_lines.isEmpty) _lines.add(_LineDraft());
   }
@@ -131,31 +110,6 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     super.dispose();
   }
 
-  Future<UuidValue?> _userId() async {
-    final session = ref.read(currentSessionProvider);
-    if (session != null) return session.user.id;
-    final v = await ref.read(vehicleByIdProvider(widget.vehicleId).future);
-    return v?.ownerUserId;
-  }
-
-  Future<CatalogItem> _resolveCatalog(String name, UuidValue userId) async {
-    final items = await ref.read(catalogItemsProvider.future);
-    final found = items.where((c) => c.name.toLowerCase() == name.toLowerCase()).firstOrNull;
-    if (found != null) return found;
-    final def =
-        catalogDefaults.where((d) => d.name.toLowerCase() == name.toLowerCase()).firstOrNull;
-    final item = CatalogItem(
-      id: UuidValue.generate(),
-      userId: userId,
-      name: name,
-      defaultIntervalKm: def?.defaultIntervalKm,
-      defaultIntervalMonths: def?.defaultIntervalMonths,
-      updatedAt: DateTime.now().toUtc(),
-    );
-    await ref.read(catalogItemRepositoryProvider).save(item);
-    return item;
-  }
-
   Future<void> _save() async {
     final odo = int.tryParse(_odo.text.trim());
     if (odo == null) {
@@ -163,7 +117,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
           .showSnackBar(const SnackBar(content: Text('Kilométrage requis.')));
       return;
     }
-    final drafts = _lines.where((d) => d.nameCtrl.text.trim().isNotEmpty).toList();
+    final drafts = _lines.where((d) => d.labelCtrl.text.trim().isNotEmpty).toList();
     if (drafts.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Ajoute au moins un poste.')));
@@ -173,8 +127,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     final now = DateTime.now().toUtc();
     final opId = widget.existing?.id ?? UuidValue.generate();
 
-    // Opération d'abord, puis ses lignes (ordre = contrat FK côté sync, et la
-    // dérivation lit les lignes via leur opération parente).
+    // Opération d'abord, puis ses lignes (ordre = contrat FK côté sync).
     final op = Operation(
       id: opId,
       vehicleId: UuidValue.parse(widget.vehicleId),
@@ -189,25 +142,12 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     );
     await ref.read(operationRepositoryProvider).save(op);
 
-    final userId = await _userId();
-    final usedCatalog = <CatalogItem>[];
     final keptLineIds = <String>{};
     for (final d in drafts) {
-      final name = d.nameCtrl.text.trim();
-      UuidValue? catalogItemId;
-      String? label;
-      if (d.freeMode || userId == null) {
-        label = name;
-      } else {
-        final item = await _resolveCatalog(name, userId);
-        catalogItemId = item.id;
-        usedCatalog.add(item);
-      }
       final line = OperationLine(
         id: d.existingId ?? UuidValue.generate(),
         operationId: opId,
-        catalogItemId: catalogItemId,
-        label: label,
+        label: d.labelCtrl.text.trim(),
         partsCost: _num(d.partsCtrl.text),
         laborCost: _num(d.laborCtrl.text),
         updatedAt: now,
@@ -222,84 +162,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
       }
     }
 
-    if (!mounted) return;
-    await _maybeEmerge(usedCatalog);
     if (mounted) Navigator.of(context).pop();
-  }
-
-  /// Émergence : pour chaque poste de catalogue sans plan existant, proposer de
-  /// programmer un rappel (intervalles pré-suggérés par le catalogue).
-  Future<void> _maybeEmerge(List<CatalogItem> used) async {
-    if (used.isEmpty) return;
-    final plans = await ref.read(plansProvider(widget.vehicleId).future);
-    final planned = plans.map((p) => p.catalogItemId?.value).whereType<String>().toSet();
-    final seen = <String>{};
-    for (final item in used) {
-      if (!seen.add(item.id.value)) continue;
-      if (planned.contains(item.id.value)) continue;
-      if (!mounted) return;
-      await _promptPlan(item);
-    }
-  }
-
-  Future<void> _promptPlan(CatalogItem item) async {
-    final km = TextEditingController(text: item.defaultIntervalKm?.toString() ?? '');
-    final mo = TextEditingController(text: item.defaultIntervalMonths?.toString() ?? '');
-    final create = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Programmer un rappel ?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Être prévenu pour « ${item.name} » à l\'avenir ?'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: km,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Tous les', suffixText: 'km'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: mo,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'ou tous les', suffixText: 'mois'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non merci')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Programmer')),
-        ],
-      ),
-    );
-    if (create == true) {
-      final ikm = int.tryParse(km.text.trim());
-      final imo = int.tryParse(mo.text.trim());
-      if (ikm != null || imo != null) {
-        await ref.read(planRepositoryProvider).save(Plan(
-              id: UuidValue.generate(),
-              vehicleId: UuidValue.parse(widget.vehicleId),
-              catalogItemId: item.id,
-              intervalKm: ikm,
-              intervalMonths: imo,
-              updatedAt: DateTime.now().toUtc(),
-            ));
-      }
-    }
-    km.dispose();
-    mo.dispose();
   }
 
   Future<void> _pickDate() async {
@@ -370,6 +233,11 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               alignment: Alignment.centerLeft,
               child: Text('Postes', style: Theme.of(context).textTheme.titleMedium),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Un poste au même intitulé qu\'une échéance la remet à zéro.',
+              style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
+            ),
             const SizedBox(height: 8),
             for (var i = 0; i < _lines.length; i++) _lineCard(i),
             const SizedBox(height: 4),
@@ -400,18 +268,13 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
         children: [
           Row(
             children: [
-              IconButton(
-                tooltip: d.freeMode ? 'Libellé libre (hors catalogue)' : 'Poste du catalogue',
-                icon: Icon(d.freeMode ? Icons.edit_note : Icons.bookmark_added_outlined),
-                onPressed: () => setState(() => d.freeMode = !d.freeMode),
-              ),
               Expanded(
                 child: TextField(
-                  controller: d.nameCtrl,
+                  controller: d.labelCtrl,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Poste',
-                    hintText: d.freeMode ? 'Libellé libre' : 'Vidange, filtres…',
+                    hintText: 'Vidange, Plaquettes…',
                     isDense: true,
                   ),
                 ),
@@ -419,7 +282,8 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               IconButton(
                 tooltip: 'Retirer',
                 icon: const Icon(Icons.close),
-                onPressed: _lines.length > 1 ? () => setState(() => _lines.removeAt(i).dispose()) : null,
+                onPressed:
+                    _lines.length > 1 ? () => setState(() => _lines.removeAt(i).dispose()) : null,
               ),
             ],
           ),

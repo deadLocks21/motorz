@@ -1,19 +1,20 @@
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 
-/// Échéance à prévoir (§5.6). Deux natures, implicites :
-/// - **récurrente** : rattachée à un poste de catalogue avec au moins un
-///   intervalle (km/mois) ; sa prochaine échéance est dérivée de l'historique ;
+/// Échéance à prévoir (§5.6), définie **manuellement par véhicule**. Deux natures,
+/// implicites :
+/// - **récurrente** : porte un intervalle (km et/ou mois) ; sa dernière
+///   réalisation est dérivée de l'historique (une opération portant une ligne au
+///   même intitulé que [title] la remet à zéro) ;
 /// - **à venir / ponctuelle** : cible `dueDate`/`dueOdometer` sans intervalle
-///   (CT d'une occasion, distribution jamais faite, réparation one-shot).
+///   (CT, distribution jamais faite, réparation one-shot).
 ///
-/// La **dernière réalisation n'est PAS stockée** — elle est dérivée des
-/// opérations (cf. `MaintenanceDerivationService`).
+/// La dernière réalisation n'est **pas stockée** — elle est dérivée des opérations
+/// (cf. `MaintenanceDerivationService`).
 class Plan {
   final UuidValue id;
   final UuidValue vehicleId;
-  final UuidValue? catalogItemId;
-  final String? title;
+  final String title;
   final TaskPriority? priority;
   final double? estimatedCost;
   final int? intervalKm;
@@ -26,9 +27,8 @@ class Plan {
   Plan({
     required this.id,
     required this.vehicleId,
+    required this.title,
     required this.updatedAt,
-    this.catalogItemId,
-    this.title,
     this.priority,
     this.estimatedCost,
     this.intervalKm,
@@ -36,14 +36,12 @@ class Plan {
     this.dueDate,
     this.dueOdometer,
     this.deletedAt,
-  });
+  }) : assert(title.trim().isNotEmpty, 'title cannot be empty');
 
-  /// Récurrent = rattaché à un poste de catalogue avec au moins un intervalle.
-  bool get isRecurring =>
-      catalogItemId != null && (intervalKm != null || intervalMonths != null);
+  /// Récurrent = porte au moins un intervalle.
+  bool get isRecurring => intervalKm != null || intervalMonths != null;
 
   Plan copyWith({
-    UuidValue? catalogItemId,
     String? title,
     TaskPriority? priority,
     double? estimatedCost,
@@ -57,7 +55,6 @@ class Plan {
     return Plan(
       id: id,
       vehicleId: vehicleId,
-      catalogItemId: catalogItemId ?? this.catalogItemId,
       title: title ?? this.title,
       priority: priority ?? this.priority,
       estimatedCost: estimatedCost ?? this.estimatedCost,

@@ -1,14 +1,12 @@
 import 'package:motorz/core/domain/model/uuid_value.dart';
 
-/// Ligne d'une opération : **un poste fait**. Soit rattachée à un poste de
-/// catalogue (`catalogItemId` → pilote le compteur du plan correspondant), soit
-/// un **libellé libre** (`label`) pour un one-shot hors catalogue. Exactement
-/// l'un des deux (XOR).
+/// Ligne d'une opération : **un poste fait**, décrit par un libellé libre + ses
+/// coûts. Une ligne dont l'intitulé correspond au titre d'une échéance (§5.6)
+/// remet cette échéance à zéro (rapprochement par intitulé, dérivé de l'historique).
 class OperationLine {
   final UuidValue id;
   final UuidValue operationId;
-  final UuidValue? catalogItemId;
-  final String? label;
+  final String label;
   final double? partsCost;
   final double? laborCost;
   final DateTime updatedAt;
@@ -17,16 +15,12 @@ class OperationLine {
   OperationLine({
     required this.id,
     required this.operationId,
+    required this.label,
     required this.updatedAt,
-    this.catalogItemId,
-    this.label,
     this.partsCost,
     this.laborCost,
     this.deletedAt,
-  }) : assert(
-          (catalogItemId == null) != (label == null),
-          'a line is either a catalog item or a free label, not both',
-        );
+  }) : assert(label.trim().isNotEmpty, 'label cannot be empty');
 
   /// Coût de la ligne (pièces + main d'œuvre) ; nul si rien n'est saisi.
   double? get cost {
@@ -35,6 +29,7 @@ class OperationLine {
   }
 
   OperationLine copyWith({
+    String? label,
     double? partsCost,
     double? laborCost,
     DateTime? updatedAt,
@@ -43,8 +38,7 @@ class OperationLine {
     return OperationLine(
       id: id,
       operationId: operationId,
-      catalogItemId: catalogItemId,
-      label: label,
+      label: label ?? this.label,
       partsCost: partsCost ?? this.partsCost,
       laborCost: laborCost ?? this.laborCost,
       updatedAt: updatedAt ?? this.updatedAt,

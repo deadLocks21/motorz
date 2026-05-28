@@ -2,7 +2,6 @@ import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
@@ -16,6 +15,14 @@ import 'package:motorz/core/domain/model/vehicle.dart';
 
 UuidValue _id(Object? v) => UuidValue.parse(v as String);
 UuidValue? _idN(Object? v) => v == null ? null : UuidValue.parse(v as String);
+
+/// Lecture défensive d'un champ texte devenu requis : tolère les enregistrements
+/// locaux d'un ancien format (où le champ pouvait être `null`) en repliant sur un
+/// libellé par défaut, plutôt que de crasher au cast.
+String _strOr(Object? v, String fallback) {
+  final s = v as String?;
+  return (s == null || s.trim().isEmpty) ? fallback : s;
+}
 
 final vehicleCodec = SyncCodec<Vehicle>(
   resource: 'vehicles',
@@ -105,33 +112,6 @@ final fuelEntryCodec = SyncCodec<FuelEntry>(
   },
 );
 
-// Catalogue : scopé par utilisateur (pas de vehicle_id → vehicleIdOf null).
-final catalogItemCodec = SyncCodec<CatalogItem>(
-  resource: 'maintenance_catalog_items',
-  idOf: (e) => e.id.value,
-  vehicleIdOf: (e) => null,
-  updatedAtOf: (e) => e.updatedAt,
-  deletedAtOf: (e) => e.deletedAt,
-  fromJson: (m) => CatalogItem(
-    id: _id(m['id']),
-    userId: _id(m['user_id']),
-    name: m['name'] as String,
-    defaultIntervalKm: intOrNull(m['default_interval_km']),
-    defaultIntervalMonths: intOrNull(m['default_interval_months']),
-    updatedAt: parseDate(m['updated_at']),
-    deletedAt: parseDateOrNull(m['deleted_at']),
-  ),
-  toJson: (e) => {
-    'id': e.id.value,
-    'user_id': e.userId.value,
-    'name': e.name,
-    'default_interval_km': e.defaultIntervalKm,
-    'default_interval_months': e.defaultIntervalMonths,
-    'updated_at': isoOrNull(e.updatedAt),
-    'deleted_at': isoOrNull(e.deletedAt),
-  },
-);
-
 final operationCodec = SyncCodec<Operation>(
   resource: 'maintenance_operations',
   idOf: (e) => e.id.value,
@@ -177,8 +157,7 @@ final operationLineCodec = SyncCodec<OperationLine>(
   fromJson: (m) => OperationLine(
     id: _id(m['id']),
     operationId: _id(m['operation_id']),
-    catalogItemId: _idN(m['catalog_item_id']),
-    label: m['label'] as String?,
+    label: _strOr(m['label'], 'Poste'),
     partsCost: doubleOrNull(m['parts_cost']),
     laborCost: doubleOrNull(m['labor_cost']),
     updatedAt: parseDate(m['updated_at']),
@@ -187,7 +166,6 @@ final operationLineCodec = SyncCodec<OperationLine>(
   toJson: (e) => {
     'id': e.id.value,
     'operation_id': e.operationId.value,
-    'catalog_item_id': e.catalogItemId?.value,
     'label': e.label,
     'parts_cost': e.partsCost,
     'labor_cost': e.laborCost,
@@ -205,8 +183,7 @@ final planCodec = SyncCodec<Plan>(
   fromJson: (m) => Plan(
     id: _id(m['id']),
     vehicleId: _id(m['vehicle_id']),
-    catalogItemId: _idN(m['catalog_item_id']),
-    title: m['title'] as String?,
+    title: _strOr(m['title'], 'Échéance'),
     priority: TaskPriority.fromWire(m['priority'] as String?),
     estimatedCost: doubleOrNull(m['estimated_cost']),
     intervalKm: intOrNull(m['interval_km']),
@@ -219,7 +196,6 @@ final planCodec = SyncCodec<Plan>(
   toJson: (e) => {
     'id': e.id.value,
     'vehicle_id': e.vehicleId.value,
-    'catalog_item_id': e.catalogItemId?.value,
     'title': e.title,
     'priority': e.priority?.wire,
     'estimated_cost': e.estimatedCost,

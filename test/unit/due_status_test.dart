@@ -7,13 +7,12 @@ import 'package:motorz/core/domain/model/uuid_value.dart';
 
 void main() {
   final vehicleId = UuidValue.generate();
-  final catalogId = UuidValue.generate();
   final now = DateTime(2026, 5, 26);
 
   Plan recurring({int? intervalKm, int? intervalMonths}) => Plan(
         id: UuidValue.generate(),
         vehicleId: vehicleId,
-        catalogItemId: catalogId,
+        title: 'Vidange',
         intervalKm: intervalKm,
         intervalMonths: intervalMonths,
         updatedAt: now,
@@ -47,7 +46,7 @@ void main() {
     final plan = Plan(
       id: UuidValue.generate(),
       vehicleId: vehicleId,
-      catalogItemId: catalogId,
+      title: 'Contrôle technique',
       intervalMonths: 24,
       dueDate: '2026-05-01',
       updatedAt: now,
@@ -61,7 +60,7 @@ void main() {
     final plan = Plan(
       id: UuidValue.generate(),
       vehicleId: vehicleId,
-      catalogItemId: catalogId,
+      title: 'Contrôle technique',
       intervalMonths: 24,
       dueDate: '2026-05-01', // amorce passée
       updatedAt: now,
@@ -72,7 +71,7 @@ void main() {
     expect(due.status, DueStatus.upcoming);
   });
 
-  test('ponctuel sans poste : utilise la cible km', () {
+  test('ponctuel (sans intervalle) : utilise la cible km', () {
     final plan = Plan(
       id: UuidValue.generate(),
       vehicleId: vehicleId,

@@ -13,8 +13,6 @@ import 'package:motorz/ui/pages/vehicle_detail/vehicle_detail.page.dart';
 import 'package:motorz/ui/theme/app_theme_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Hors-ligne : les écritures restent locales, l'UI se met à jour via le stream
-/// `changes` du store (aucune synchro réseau).
 class _OfflineConnectivity implements ConnectivityService {
   const _OfflineConnectivity();
   @override
@@ -59,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('opération à lignes : saisie + émergence d\'un plan + projection', (tester) async {
+  testWidgets('opération à lignes libres : saisie + apparition dans Entretien', (tester) async {
     final (store, vehicleId) = await seed();
     await pumpDetail(tester, store, vehicleId);
 
@@ -67,15 +65,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Aucune opération d\'entretien enregistrée.'), findsOneWidget);
 
-    // FAB → feuille « Entretien réalisé ».
     await tester.tap(find.byKey(const Key('detailFab')));
     await tester.pumpAndSettle();
     expect(find.text('Entretien réalisé'), findsOneWidget);
 
-    // Km + une ligne catalogue « Vidange » + coût pièces.
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), '20000'); // Km
-    await tester.enterText(fields.at(4), 'Vidange'); // Poste (ligne 0)
+    await tester.enterText(fields.at(4), 'Vidange'); // Poste (ligne 0, libellé libre)
     await tester.enterText(fields.at(5), '90'); // Pièces
     final saveBtn = find.widgetWithText(FilledButton, 'Enregistrer l\'opération');
     await tester.ensureVisible(saveBtn);
@@ -83,45 +79,39 @@ void main() {
     await tester.tap(saveBtn);
     await tester.pumpAndSettle();
 
-    // Émergence : on propose de programmer un rappel pour « Vidange ».
-    expect(find.text('Programmer un rappel ?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Programmer'));
-    await tester.pumpAndSettle();
-
-    // Persistance : opération + ligne + poste de catalogue + plan créés.
+    // Pas d'émergence : sauvegarde directe.
     expect((await store.query('maintenance_operations')), hasLength(1));
     expect((await store.query('maintenance_operation_lines')), hasLength(1));
-    expect((await store.query('maintenance_catalog_items')), hasLength(1));
-    expect((await store.query('maintenance_plans')), hasLength(1));
+    expect((await store.query('maintenance_catalog_items')), isEmpty);
     // Titre dérivé « Vidange » dans la liste.
-    expect(find.text('Vidange'), findsWidgets);
-
-    // À prévoir : projection sans bouton « Fait », bouton « Gérer » présent.
-    await tester.tap(find.text('À prévoir'));
-    await tester.pumpAndSettle();
-    expect(find.text('Fait'), findsNothing);
-    expect(find.text('Gérer'), findsOneWidget);
     expect(find.text('Vidange'), findsWidgets);
   });
 
-  testWidgets('À prévoir : le + crée une échéance à venir (sans passé)', (tester) async {
+  testWidgets('À prévoir : le + crée une tâche ponctuelle → section « À réaliser »', (tester) async {
     final (store, vehicleId) = await seed();
     await pumpDetail(tester, store, vehicleId);
 
     await tester.tap(find.text('À prévoir'));
     await tester.pumpAndSettle();
+    expect(find.text('Fait'), findsNothing); // plus de bouton « Fait »
 
     await tester.tap(find.byKey(const Key('detailFab')));
     await tester.pumpAndSettle();
-    expect(find.text('Échéance à venir'), findsOneWidget);
+    expect(find.text('Nouvelle entrée'), findsOneWidget);
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(0), 'Distribution'); // Titre
-    await tester.enterText(fields.at(1), '120000'); // Avant km
-    await tester.tap(find.widgetWithText(FilledButton, 'Enregistrer'));
+    // Bascule sur « Ponctuelle » → pas d'intervalle requis.
+    await tester.tap(find.text('Ponctuelle'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'Changer le rétroviseur'); // Titre
+    final saveBtn = find.widgetWithText(FilledButton, 'Enregistrer');
+    await tester.ensureVisible(saveBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(saveBtn);
     await tester.pumpAndSettle();
 
     expect((await store.query('maintenance_plans')), hasLength(1));
-    expect(find.text('Distribution'), findsWidgets);
+    // Une ponctuelle sans déclencheur apparaît sous « À réaliser ».
+    expect(find.text('À RÉALISER'), findsOneWidget);
+    expect(find.text('Changer le rétroviseur'), findsWidgets);
   });
 }

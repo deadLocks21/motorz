@@ -5,7 +5,6 @@ import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
@@ -79,15 +78,6 @@ Future<List<OperationLine>> linesForVehicle(Ref ref, String vehicleId) async {
 Future<List<Plan>> plans(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
   return ref.watch(planRepositoryProvider).listForVehicle(vehicleId);
-}
-
-/// Catalogue de postes de l'utilisateur (trié par nom).
-@riverpod
-Future<List<CatalogItem>> catalogItems(Ref ref) async {
-  ref.watch(storeChangesProvider);
-  final list = await ref.watch(catalogItemRepositoryProvider).listAll();
-  list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-  return list;
 }
 
 @riverpod
@@ -194,14 +184,19 @@ Future<List<DuePlan>> duePlans(Ref ref, String vehicleId) async {
   final lines = await ref.watch(linesForVehicleProvider(vehicleId).future);
   final odo = await ref.watch(currentOdometerProvider(vehicleId).future);
   final lastDones = MaintenanceDerivationService.lastDoneAll(plans, ops, lines);
-  final result = [
-    for (final pl in lastDones)
-      (
-        plan: pl.plan,
-        lastDone: pl.lastDone,
-        due: DueStatusService.compute(pl.plan, lastDone: pl.lastDone, currentOdometer: odo),
-      ),
-  ];
+  final result = <DuePlan>[];
+  for (final pl in lastDones) {
+    // Tâche ponctuelle (sans intervalle) déjà faite → masquée de À prévoir.
+    if (!pl.plan.isRecurring &&
+        MaintenanceDerivationService.isOneShotDone(pl.plan, ops, lines)) {
+      continue;
+    }
+    result.add((
+      plan: pl.plan,
+      lastDone: pl.lastDone,
+      due: DueStatusService.compute(pl.plan, lastDone: pl.lastDone, currentOdometer: odo),
+    ));
+  }
   int rank(DueStatus s) => switch (s) {
     DueStatus.overdue => 0,
     DueStatus.dueSoon => 1,

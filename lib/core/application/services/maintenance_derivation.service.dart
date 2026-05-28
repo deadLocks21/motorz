@@ -1,9 +1,8 @@
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
 
-/// Dernière réalisation dérivée d'un poste (km + date de l'opération).
+/// Dernière réalisation dérivée d'une échéance (km + date de l'opération).
 class LastDone {
   final int odometer;
   final DateTime date;
@@ -11,73 +10,79 @@ class LastDone {
 }
 
 /// Dérivations de l'entretien — **pures et locales** (offline-first). Aucun état
-/// « dernière fois faite » n'est stocké : tout se recalcule depuis l'historique
-/// des opérations, ce qui rend la **saisie rétroactive** sûre (insérer/supprimer
-/// une opération recalcule mécaniquement la bonne échéance).
+/// « dernière fois faite » n'est stocké : il se recalcule depuis l'historique des
+/// opérations, ce qui rend la **saisie rétroactive** sûre. Le rapprochement
+/// échéance ↔ opération se fait **par intitulé** (titre de l'échéance == libellé
+/// d'une ligne, insensible à la casse/aux espaces).
 abstract final class MaintenanceDerivationService {
-  /// Dernière réalisation d'un plan = l'opération **non supprimée** la plus
-  /// récente (par **km**, puis date) portant une ligne du même poste de
-  /// catalogue. `null` pour un plan sans poste (à-venir/one-shot) ou sans
-  /// historique. Le km est prioritaire ⇒ une saisie rétro à km inférieur
-  /// n'écrase pas une réalisation plus récente.
+  static String _norm(String s) => s.trim().toLowerCase();
+
+  /// Dernière réalisation d'une échéance = l'opération **non supprimée** la plus
+  /// récente (par **km**, puis date) portant une ligne au même intitulé que
+  /// [plan]. `null` si aucune. Le km prioritaire ⇒ une saisie rétro à km
+  /// inférieur n'écrase pas une réalisation plus récente.
   static LastDone? lastDoneForPlan(
     Plan plan,
     List<Operation> operations,
     List<OperationLine> lines,
   ) {
-    final catalogId = plan.catalogItemId;
-    if (catalogId == null) return null;
     final opsById = _opsById(operations);
+    final target = _norm(plan.title);
     return _best(
       lines.where((l) =>
           l.deletedAt == null &&
-          l.catalogItemId == catalogId &&
+          _norm(l.label) == target &&
           opsById.containsKey(l.operationId.value)),
       opsById,
     );
   }
 
-  /// Dernière réalisation de **tous** les plans en une passe : pré-bucketise les
-  /// lignes par poste de catalogue (O(L + P)) plutôt qu'un scan par plan.
+  /// Dernière réalisation de **toutes** les échéances en une passe : pré-bucketise
+  /// les lignes par intitulé normalisé (O(L + P)).
   static List<({Plan plan, LastDone? lastDone})> lastDoneAll(
     List<Plan> plans,
     List<Operation> operations,
     List<OperationLine> lines,
   ) {
     final opsById = _opsById(operations);
-    final byCatalog = <String, List<OperationLine>>{};
+    final byLabel = <String, List<OperationLine>>{};
     for (final l in lines) {
-      final cid = l.catalogItemId;
-      if (l.deletedAt != null || cid == null) continue;
-      if (!opsById.containsKey(l.operationId.value)) continue;
-      (byCatalog[cid.value] ??= []).add(l);
+      if (l.deletedAt != null || !opsById.containsKey(l.operationId.value)) continue;
+      (byLabel[_norm(l.label)] ??= []).add(l);
     }
     return [
       for (final p in plans)
-        (
-          plan: p,
-          lastDone: p.catalogItemId == null
-              ? null
-              : _best(byCatalog[p.catalogItemId!.value] ?? const [], opsById),
-        ),
+        (plan: p, lastDone: _best(byLabel[_norm(p.title)] ?? const [], opsById)),
     ];
   }
 
-  /// Titre dérivé des lignes : nom du premier poste + « + N autres ».
-  static String deriveTitle(
+  /// Une **tâche ponctuelle** est faite (→ à masquer de À prévoir) dès qu'une
+  /// opération **non supprimée** porte une ligne au même intitulé que le titre,
+  /// **et que cette opération a été enregistrée après la création de la tâche**
+  /// (`op.updatedAt >= plan.updatedAt`) — pour ne pas la considérer « déjà faite »
+  /// à cause d'un historique ancien au libellé identique.
+  static bool isOneShotDone(
+    Plan plan,
+    List<Operation> operations,
     List<OperationLine> lines,
-    Map<String, CatalogItem> catalogById,
   ) {
-    final labels = [
-      for (final l in lines)
-        l.catalogItemId != null
-            ? (catalogById[l.catalogItemId!.value]?.name ?? 'Poste')
-            : (l.label ?? 'Poste'),
-    ];
-    if (labels.isEmpty) return 'Opération';
-    if (labels.length == 1) return labels.first;
-    final others = labels.length - 1;
-    return '${labels.first} + $others autre${others > 1 ? 's' : ''}';
+    final opsById = _opsById(operations);
+    final target = _norm(plan.title);
+    for (final l in lines) {
+      if (l.deletedAt != null || _norm(l.label) != target) continue;
+      final op = opsById[l.operationId.value];
+      if (op == null) continue;
+      if (!op.updatedAt.isBefore(plan.updatedAt)) return true;
+    }
+    return false;
+  }
+
+  /// Titre dérivé des lignes : libellé de la première + « + N autres ».
+  static String deriveTitle(List<OperationLine> lines) {
+    if (lines.isEmpty) return 'Opération';
+    if (lines.length == 1) return lines.first.label;
+    final others = lines.length - 1;
+    return '${lines.first.label} + $others autre${others > 1 ? 's' : ''}';
   }
 
   /// Coût effectif d'une opération = somme des coûts de ses lignes (null si rien).
@@ -93,19 +98,6 @@ abstract final class MaintenanceDerivationService {
       }
     }
     return any ? sum : null;
-  }
-
-  /// Coût par poste de catalogue (stats §5.9). Lignes libres ⇒ clé `null`.
-  static Map<String?, double> costPerCatalogItem(List<OperationLine> lines) {
-    final out = <String?, double>{};
-    for (final l in lines) {
-      if (l.deletedAt != null) continue;
-      final c = l.cost;
-      if (c == null) continue;
-      final key = l.catalogItemId?.value;
-      out[key] = (out[key] ?? 0) + c;
-    }
-    return out;
   }
 
   static Map<String, Operation> _opsById(List<Operation> ops) => {

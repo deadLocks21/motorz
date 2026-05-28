@@ -2,7 +2,6 @@ import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
@@ -11,9 +10,9 @@ import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 
 /// Garnit le store local d'un véhicule de démonstration (une Ford Mustang GT,
-/// avec pleins, catalogue, opérations à lignes et échéances) — appelé **au login
-/// en mode `memory`** (local-only), pour que l'app installée depuis le Play Store
-/// ne s'ouvre pas sur un garage vide.
+/// avec pleins, opérations à lignes et échéances) — appelé **au login en mode
+/// `memory`** (local-only), pour que l'app installée depuis le Play Store ne
+/// s'ouvre pas sur un garage vide.
 ///
 /// Les données sont rattachées au compte démo connecté ([_ownerId] = l'`id` de la
 /// session, déterministe en local-only), si bien que la Mustang apparaît sous
@@ -36,15 +35,6 @@ class DemoSeed {
   // IDs fixes (et non générés) pour que le seed soit déterministe et rejouable.
   static const _vehicleId = '0a5c0000-0000-4000-8000-000000000001';
 
-  // Postes de catalogue (déterministes → référencés par les plans et les lignes).
-  static const _catVidange = '0a5c0000-0000-4000-8000-0000000ca001';
-  static const _catFiltreAir = '0a5c0000-0000-4000-8000-0000000ca002';
-  static const _catFiltreHab = '0a5c0000-0000-4000-8000-0000000ca003';
-  static const _catFreins = '0a5c0000-0000-4000-8000-0000000ca004';
-  static const _catDistribution = '0a5c0000-0000-4000-8000-0000000ca005';
-  static const _catPneus = '0a5c0000-0000-4000-8000-0000000ca006';
-  static const _catCt = '0a5c0000-0000-4000-8000-0000000ca007';
-
   Future<void> ensureSeeded() async {
     final existing = await _store.query('vehicles', includeDeleted: true);
     if (existing.isNotEmpty) return;
@@ -53,9 +43,6 @@ class DemoSeed {
     await _put(vehicleCodec, _mustang(vehicleId));
     for (final fuel in _fuelEntries(vehicleId)) {
       await _put(fuelEntryCodec, fuel);
-    }
-    for (final c in _catalog()) {
-      await _put(catalogItemCodec, c);
     }
     for (final op in _operations(vehicleId)) {
       await _put(operationCodec, op);
@@ -129,28 +116,6 @@ class DemoSeed {
 
   static final _seedAt = DateTime.utc(2026, 5, 20, 9);
 
-  /// Catalogue de référence (les défauts de `catalogDefaults`), rattaché au compte.
-  List<CatalogItem> _catalog() {
-    CatalogItem c(String id, String name, {int? km, int? months}) => CatalogItem(
-          id: UuidValue.parse(id),
-          userId: _ownerId,
-          name: name,
-          defaultIntervalKm: km,
-          defaultIntervalMonths: months,
-          updatedAt: _seedAt,
-        );
-
-    return [
-      c(_catVidange, 'Vidange', km: 15000, months: 12),
-      c(_catFiltreAir, 'Filtre à air', km: 30000),
-      c(_catFiltreHab, 'Filtre habitacle', months: 12),
-      c(_catFreins, 'Plaquettes de frein', km: 40000),
-      c(_catDistribution, 'Distribution', km: 100000, months: 120),
-      c(_catPneus, 'Pneumatiques', km: 40000),
-      c(_catCt, 'Contrôle technique', months: 24),
-    ];
-  }
-
   /// Trois opérations (en-têtes), cohérentes en date/km avec les pleins.
   List<Operation> _operations(UuidValue vehicleId) {
     Operation o(String suffix, DateTime date, int odometer, String provider, String note) =>
@@ -174,15 +139,14 @@ class DemoSeed {
     ];
   }
 
-  /// Lignes des opérations (postes faits) : la plupart rattachées au catalogue,
-  /// une ligne libre pour illustrer le hors-catalogue.
+  /// Lignes des opérations (postes faits, en libellé libre). Les intitulés
+  /// « Vidange » correspondent au titre de l'échéance → la remettent à zéro.
   List<OperationLine> _lines() {
-    OperationLine line(String suffix, String opSuffix,
-            {String? catalogId, String? label, double? parts, double? labor}) =>
+    OperationLine line(String suffix, String opSuffix, String label,
+            {double? parts, double? labor}) =>
         OperationLine(
           id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d$suffix'),
           operationId: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e$opSuffix'),
-          catalogItemId: catalogId == null ? null : UuidValue.parse(catalogId),
           label: label,
           partsCost: parts,
           laborCost: labor,
@@ -191,24 +155,26 @@ class DemoSeed {
 
     return [
       // Op1 : vidange + filtre habitacle (370 € au total).
-      line('0001', '0001', catalogId: _catVidange, parts: 120, labor: 150),
-      line('0002', '0001', catalogId: _catFiltreHab, parts: 40, labor: 60),
+      line('0001', '0001', 'Vidange', parts: 120, labor: 150),
+      line('0002', '0001', 'Filtre habitacle', parts: 40, labor: 60),
       // Op2 : plaquettes (235 €).
-      line('0003', '0002', catalogId: _catFreins, parts: 145, labor: 90),
+      line('0003', '0002', 'Plaquettes de frein', parts: 145, labor: 90),
       // Op3 : pneus + une ligne libre (570 €).
-      line('0004', '0003', catalogId: _catPneus, parts: 460, labor: 80),
-      line('0005', '0003', label: 'Géométrie / parallélisme', labor: 30),
+      line('0004', '0003', 'Pneumatiques', parts: 460, labor: 80),
+      line('0005', '0003', 'Géométrie / parallélisme', labor: 30),
     ];
   }
 
-  /// Échéances : une récurrente (vidange, dont la dernière réalisation se dérive
-  /// d'Op1), une à-venir avec amorce (CT d'occasion), une à-venir pure (distribution).
+  /// Échéances. Récurrentes : Vidange (dernière réalisation dérivée de l'opération
+  /// de 2024, dont une ligne s'intitule « Vidange ») et CT (avec amorce datée).
+  /// Ponctuelles (sans intervalle) : Distribution (cible km, → Prochaines
+  /// échéances) et un petit à-faire sans date (→ À réaliser).
   List<Plan> _plans(UuidValue vehicleId) {
     return [
       Plan(
         id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0001'),
         vehicleId: vehicleId,
-        catalogItemId: UuidValue.parse(_catVidange),
+        title: 'Vidange',
         intervalKm: 15000,
         intervalMonths: 12,
         updatedAt: _seedAt,
@@ -216,7 +182,7 @@ class DemoSeed {
       Plan(
         id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0002'),
         vehicleId: vehicleId,
-        catalogItemId: UuidValue.parse(_catCt),
+        title: 'Contrôle technique',
         intervalMonths: 24,
         dueDate: '2026-09-01',
         updatedAt: _seedAt,
@@ -226,6 +192,12 @@ class DemoSeed {
         vehicleId: vehicleId,
         title: 'Distribution',
         dueOdometer: 120000,
+        updatedAt: _seedAt,
+      ),
+      Plan(
+        id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0004'),
+        vehicleId: vehicleId,
+        title: 'Changer l\'ampoule de plaque',
         updatedAt: _seedAt,
       ),
     ];

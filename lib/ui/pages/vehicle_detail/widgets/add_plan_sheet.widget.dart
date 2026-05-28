@@ -1,38 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 
-/// Crée ou édite un **plan** (échéance à prévoir).
-/// - Sans [existing] : crée une **échéance à venir** (CT d'occasion, distribution
-///   jamais faite, réparation ponctuelle) — titre + cible date/km.
-/// - Avec un plan **récurrent** (poste de catalogue) : édite ses **intervalles**.
-/// - Avec un plan **ponctuel** : édite titre + cible.
-///
-/// Les plans récurrents se créent par **émergence** (saisie d'opération), pas ici.
+/// Crée ou édite une entrée de l'onglet *À prévoir*, de deux natures :
+/// - **Échéance récurrente** : porte un intervalle (km et/ou mois) ; se remet à
+///   zéro quand une opération porte une ligne au même intitulé que le titre ;
+///   ne disparaît jamais (elle cycle).
+/// - **Tâche ponctuelle** : à faire une fois (ex. changer un rétroviseur), sans
+///   périodicité, cible date/km optionnelle ; **disparaît une fois faite** (une
+///   opération du même intitulé). Peut être recréée plus tard.
 Future<void> showPlanSheet(
   BuildContext context,
   WidgetRef ref, {
   required String vehicleId,
   Plan? existing,
-  Map<String, CatalogItem> catalogById = const {},
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _PlanSheet(vehicleId: vehicleId, existing: existing, catalogById: catalogById),
+    builder: (_) => _PlanSheet(vehicleId: vehicleId, existing: existing),
   );
 }
 
 class _PlanSheet extends ConsumerStatefulWidget {
-  const _PlanSheet({required this.vehicleId, this.existing, this.catalogById = const {}});
+  const _PlanSheet({required this.vehicleId, this.existing});
   final String vehicleId;
   final Plan? existing;
-  final Map<String, CatalogItem> catalogById;
 
   @override
   ConsumerState<_PlanSheet> createState() => _PlanSheetState();
@@ -44,14 +41,14 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
   late final TextEditingController _intervalMonths;
   late final TextEditingController _dueOdometer;
   DateTime? _dueDate;
+  late bool _oneShot; // true = tâche ponctuelle ; false = échéance récurrente
   bool _saving = false;
-
-  bool get _recurring => widget.existing?.catalogItemId != null;
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
+    _oneShot = e != null ? !e.isRecurring : false;
     _title = TextEditingController(text: e?.title ?? '');
     _intervalKm = TextEditingController(text: e?.intervalKm?.toString() ?? '');
     _intervalMonths = TextEditingController(text: e?.intervalMonths?.toString() ?? '');
@@ -68,26 +65,33 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
   }
 
   Future<void> _save() async {
-    final e = widget.existing;
-    final now = DateTime.now().toUtc();
-    if (!_recurring && _title.text.trim().isEmpty) {
+    final title = _title.text.trim();
+    if (title.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Donne un titre à l\'échéance.')));
+          .showSnackBar(const SnackBar(content: Text('Donne un titre.')));
+      return;
+    }
+    final km = _oneShot ? null : int.tryParse(_intervalKm.text.trim());
+    final months = _oneShot ? null : int.tryParse(_intervalMonths.text.trim());
+    if (!_oneShot && km == null && months == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Renseigne un intervalle (km ou mois) pour une échéance récurrente.')),
+      );
       return;
     }
     setState(() => _saving = true);
+    final e = widget.existing;
     final plan = Plan(
       id: e?.id ?? UuidValue.generate(),
       vehicleId: UuidValue.parse(widget.vehicleId),
-      catalogItemId: e?.catalogItemId,
-      title: _recurring ? e?.title : (_title.text.trim().isEmpty ? null : _title.text.trim()),
+      title: title,
       priority: e?.priority,
       estimatedCost: e?.estimatedCost,
-      intervalKm: _recurring ? int.tryParse(_intervalKm.text.trim()) : e?.intervalKm,
-      intervalMonths: _recurring ? int.tryParse(_intervalMonths.text.trim()) : e?.intervalMonths,
-      dueDate: _recurring ? e?.dueDate : _dueDate?.toIso8601String().substring(0, 10),
-      dueOdometer: _recurring ? e?.dueOdometer : int.tryParse(_dueOdometer.text.trim()),
-      updatedAt: now,
+      intervalKm: km,
+      intervalMonths: months,
+      dueDate: _dueDate?.toIso8601String().substring(0, 10),
+      dueOdometer: int.tryParse(_dueOdometer.text.trim()),
+      updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(planRepositoryProvider).save(plan);
     if (mounted) Navigator.of(context).pop();
@@ -103,50 +107,64 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    final e = widget.existing;
-    final catalogName =
-        e?.catalogItemId != null ? widget.catalogById[e!.catalogItemId!.value]?.name : null;
-    final heading = _recurring
-        ? 'Rappel récurrent${catalogName != null ? ' · $catalogName' : ''}'
-        : (e == null ? 'Échéance à venir' : 'Modifier l\'échéance');
-
+    final isEdit = widget.existing != null;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(heading, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          if (_recurring) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _intervalKm,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Tous les', suffixText: 'km'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _intervalMonths,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'ou tous les', suffixText: 'mois'),
-                  ),
-                ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(isEdit ? 'Modifier' : 'Nouvelle entrée',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('Échéance'), icon: Icon(Icons.autorenew)),
+                ButtonSegment(value: true, label: Text('Ponctuelle'), icon: Icon(Icons.task_alt)),
               ],
+              selected: {_oneShot},
+              onSelectionChanged: (s) => setState(() => _oneShot = s.first),
             ),
-          ] else ...[
+            const SizedBox(height: 16),
             TextField(
               controller: _title,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Titre', hintText: 'Contrôle technique, distribution…'),
+              decoration: InputDecoration(
+                labelText: 'Titre',
+                hintText: _oneShot ? 'Changer le rétroviseur…' : 'Vidange, Contrôle technique…',
+              ),
             ),
-            const SizedBox(height: 12),
+            if (!_oneShot) ...[
+              const SizedBox(height: 16),
+              Text('Récurrence', style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _intervalKm,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(labelText: 'Tous les', suffixText: 'km'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _intervalMonths,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(labelText: 'ou tous les', suffixText: 'mois'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(_oneShot ? 'À faire avant (optionnel)' : 'Échéance cible / amorce (optionnel)',
+                style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -177,18 +195,18 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: _saving ? null : _save, child: const Text('Enregistrer')),
+            if (isEdit) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _delete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Supprimer'),
+              ),
+            ],
           ],
-          const SizedBox(height: 20),
-          FilledButton(onPressed: _saving ? null : _save, child: const Text('Enregistrer')),
-          if (e != null) ...[
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _delete,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Supprimer cette échéance'),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

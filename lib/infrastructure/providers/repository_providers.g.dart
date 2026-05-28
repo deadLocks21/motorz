@@ -105,56 +105,6 @@ final class FuelRepositoryProvider
 
 String _$fuelRepositoryHash() => r'841778c8de547aceb87fc847a556edecd3ec903a';
 
-@ProviderFor(catalogItemRepository)
-final catalogItemRepositoryProvider = CatalogItemRepositoryProvider._();
-
-final class CatalogItemRepositoryProvider
-    extends
-        $FunctionalProvider<
-          SyncableRepository<CatalogItem>,
-          SyncableRepository<CatalogItem>,
-          SyncableRepository<CatalogItem>
-        >
-    with $Provider<SyncableRepository<CatalogItem>> {
-  CatalogItemRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'catalogItemRepositoryProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$catalogItemRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<SyncableRepository<CatalogItem>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  SyncableRepository<CatalogItem> create(Ref ref) {
-    return catalogItemRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(SyncableRepository<CatalogItem> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<SyncableRepository<CatalogItem>>(
-        value,
-      ),
-    );
-  }
-}
-
-String _$catalogItemRepositoryHash() =>
-    r'dc32732cb3240fe6ef3c6976babde845f2d78c01';
-
 @ProviderFor(operationRepository)
 final operationRepositoryProvider = OperationRepositoryProvider._();
 

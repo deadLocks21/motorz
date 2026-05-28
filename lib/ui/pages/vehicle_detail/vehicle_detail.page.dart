@@ -6,13 +6,10 @@ import 'package:motorz/core/application/services/maintenance_derivation.service.
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
-import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
-import 'package:motorz/ui/pages/plans/plan_list.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
@@ -199,14 +196,6 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
   }
 }
 
-/// Libellé d'un plan : nom du poste de catalogue, sinon titre, sinon défaut.
-String _planLabel(Plan p, Map<String, CatalogItem> catalogById) {
-  if (p.catalogItemId != null) {
-    return catalogById[p.catalogItemId!.value]?.name ?? 'Échéance';
-  }
-  return p.title ?? 'Échéance';
-}
-
 // ── Onglets ─────────────────────────────────────────────────────────────────
 
 class _OverviewTab extends ConsumerWidget {
@@ -222,8 +211,6 @@ class _OverviewTab extends ConsumerWidget {
     final conso = ref.watch(averageConsumptionProvider(id)).value;
     final fuel = ref.watch(fuelEntriesProvider(id)).value ?? const [];
     final due = ref.watch(duePlansProvider(id)).value ?? const [];
-    final catalog = ref.watch(catalogItemsProvider).value ?? const [];
-    final catalogById = {for (final c in catalog) c.id.value: c};
     final upcoming = due.where((d) => d.due.hasTrigger).take(3).toList();
 
     return ListView(
@@ -281,8 +268,7 @@ class _OverviewTab extends ConsumerWidget {
         if (upcoming.isEmpty)
           Text('Rien à prévoir.', style: TextStyle(color: colors.textMuted))
         else
-          ...upcoming.map((d) =>
-              _DueRow(label: _planLabel(d.plan, catalogById), due: d.due, colors: colors)),
+          ...upcoming.map((d) => _DueRow(label: d.plan.title, due: d.due, colors: colors)),
         if (isOwner) ...[
           const SizedBox(height: 24),
           OutlinedButton.icon(
@@ -370,6 +356,109 @@ class _DueRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Carte d'échéance (onglet À prévoir) : icône colorée selon nature + statut,
+/// titre, échéance concrète, pastille de statut. Tap → édition.
+class _DueCard extends StatelessWidget {
+  const _DueCard({
+    required this.title,
+    required this.due,
+    required this.recurring,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final String title;
+  final DueInfo due;
+  final bool recurring;
+  final AppColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (statusColor, statusLabel) = switch (due.status) {
+      DueStatus.overdue => (colors.statusOverdue, 'En retard'),
+      DueStatus.dueSoon => (colors.statusSoon, 'Bientôt'),
+      DueStatus.upcoming => (colors.statusOk, due.hasTrigger ? 'À venir' : 'À faire'),
+    };
+    final detail = _dueDetail(due);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(recurring ? Icons.autorenew : Icons.task_alt, color: statusColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    if (detail != null) ...[
+                      const SizedBox(height: 2),
+                      Text(detail, style: TextStyle(color: colors.textMuted, fontSize: 12.5)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _StatusPill(label: statusLabel, color: statusColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+      );
+}
+
+/// Échéance concrète d'un plan en texte court (km et/ou délai). `null` si aucun
+/// déclencheur (ponctuelle sans cible).
+String? _dueDetail(DueInfo due) {
+  final bits = <String>[];
+  final km = due.remainingKm;
+  if (km != null) {
+    bits.add(km <= 0 ? 'dépassé de ${formatKm(-km)}' : 'dans ~${formatKm(km)}');
+  }
+  final d = due.remainingDays;
+  if (d != null) {
+    String human(int days) => days >= 60 ? '~${(days / 30).round()} mois' : '~$days j';
+    bits.add(d < 0 ? 'en retard de ${human(-d)}' : 'dans ${human(d)}');
+  }
+  return bits.isEmpty ? null : bits.join(' · ');
 }
 
 class _EmptyTab extends StatelessWidget {
@@ -488,8 +577,6 @@ class _MaintenanceTab extends ConsumerWidget {
     final colors = context.appColors;
     final async = ref.watch(operationsProvider(vehicleId));
     final lines = ref.watch(linesForVehicleProvider(vehicleId)).value ?? const <OperationLine>[];
-    final catalog = ref.watch(catalogItemsProvider).value ?? const <CatalogItem>[];
-    final catalogById = {for (final c in catalog) c.id.value: c};
     final linesByOp = <String, List<OperationLine>>{};
     for (final l in lines) {
       (linesByOp[l.operationId.value] ??= []).add(l);
@@ -508,7 +595,7 @@ class _MaintenanceTab extends ConsumerWidget {
           itemBuilder: (_, i) {
             final op = operations[i];
             final opLines = linesByOp[op.id.value] ?? const [];
-            final title = op.title ?? MaintenanceDerivationService.deriveTitle(opLines, catalogById);
+            final title = op.title ?? MaintenanceDerivationService.deriveTitle(opLines);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.build, color: colors.accent),
@@ -538,48 +625,71 @@ class _TasksTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
     final async = ref.watch(duePlansProvider(vehicleId));
-    final catalog = ref.watch(catalogItemsProvider).value ?? const <CatalogItem>[];
-    final catalogById = {for (final c in catalog) c.id.value: c};
     return async.when(
       skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (items) {
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Prochaines échéances',
-                      style: Theme.of(context).textTheme.titleMedium),
-                ),
-                TextButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => PlanListPage(vehicleId: vehicleId)),
-                  ),
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Gérer'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (items.isEmpty)
-              Text(
-                'Rien à prévoir. Les rappels apparaissent en saisissant une opération, '
-                'ou touche + pour une échéance à venir.',
-                style: TextStyle(color: colors.textMuted),
-              )
-            else
-              ...items.map((d) => InkWell(
-                    onTap: () => showPlanSheet(context, ref,
-                        vehicleId: vehicleId, existing: d.plan, catalogById: catalogById),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: _DueRow(
-                          label: _planLabel(d.plan, catalogById), due: d.due, colors: colors),
+        // « À réaliser » : en retard / bientôt dû, ou tâche sans déclencheur
+        // (ponctuelle à faire). « Prochaines échéances » : à venir (informatif).
+        final aRealiser = items
+            .where((d) =>
+                d.due.status == DueStatus.overdue ||
+                d.due.status == DueStatus.dueSoon ||
+                !d.due.hasTrigger)
+            .toList();
+        final prochaines =
+            items.where((d) => d.due.status == DueStatus.upcoming && d.due.hasTrigger).toList();
+
+        Widget row(DuePlan d) => _DueCard(
+              title: d.plan.title,
+              due: d.due,
+              recurring: d.plan.isRecurring,
+              colors: colors,
+              onTap: () => showPlanSheet(context, ref, vehicleId: vehicleId, existing: d.plan),
+            );
+
+        Widget sectionHeader(String label, int count) => Padding(
+              padding: const EdgeInsets.fromLTRB(2, 16, 2, 6),
+              child: Row(
+                children: [
+                  Text(label.toUpperCase(),
+                      style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  )),
+                    child: Text('$count',
+                        style: TextStyle(
+                            color: colors.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            );
+
+        if (items.isEmpty) {
+          return const _EmptyTab(
+            'Rien à prévoir. Touche + pour une échéance récurrente ou une tâche ponctuelle.',
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+          children: [
+            if (aRealiser.isNotEmpty) ...[
+              sectionHeader('À réaliser', aRealiser.length),
+              ...aRealiser.map(row),
+            ],
+            if (prochaines.isNotEmpty) ...[
+              sectionHeader('Prochaines échéances', prochaines.length),
+              ...prochaines.map(row),
+            ],
           ],
         );
       },

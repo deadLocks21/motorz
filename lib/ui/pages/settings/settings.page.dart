@@ -4,7 +4,6 @@ import 'package:motorz/core/domain/model/app_theme_mode.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/providers/theme_providers.dart';
-import 'package:motorz/ui/pages/catalog/catalog.page.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -51,20 +50,6 @@ class SettingsPage extends ConsumerWidget {
             selected: {themeMode},
             onSelectionChanged: (s) =>
                 ref.read(themeModeControllerProvider.notifier).set(s.first),
-          ),
-          const SizedBox(height: 24),
-          Text('Entretien', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.bookmark_added_outlined, color: colors.accent),
-              title: const Text('Catalogue d\'entretien'),
-              subtitle: const Text('Postes types et intervalles par défaut'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CatalogPage()),
-              ),
-            ),
           ),
           const SizedBox(height: 32),
           OutlinedButton.icon(

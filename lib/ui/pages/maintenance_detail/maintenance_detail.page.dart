@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
@@ -49,7 +48,7 @@ class _MaintenanceOperationDetailPageState
     }
   }
 
-  Future<void> _edit(List<CatalogItem> catalog) async {
+  Future<void> _edit() async {
     final lines = await ref.read(operationLinesProvider(_operation.id.value).future);
     if (!mounted) return;
     await showAddOperationSheet(
@@ -58,7 +57,6 @@ class _MaintenanceOperationDetailPageState
       vehicleId: _operation.vehicleId.value,
       existing: _operation,
       existingLines: lines,
-      catalogById: {for (final c in catalog) c.id.value: c},
     );
     final updated = await ref.read(operationRepositoryProvider).getById(_operation.id.value);
     if (mounted && updated != null) setState(() => _operation = updated);
@@ -68,11 +66,9 @@ class _MaintenanceOperationDetailPageState
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final lines = ref.watch(operationLinesProvider(_operation.id.value)).value ?? const [];
-    final catalog = ref.watch(catalogItemsProvider).value ?? const [];
     final quotes = ref.watch(quotesForOperationProvider(_operation.id.value)).value ?? const [];
-    final catalogById = {for (final c in catalog) c.id.value: c};
     final total = MaintenanceDerivationService.operationCost(lines);
-    final title = _operation.title ?? MaintenanceDerivationService.deriveTitle(lines, catalogById);
+    final title = _operation.title ?? MaintenanceDerivationService.deriveTitle(lines);
 
     return Scaffold(
       appBar: AppBar(
@@ -81,7 +77,7 @@ class _MaintenanceOperationDetailPageState
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Modifier',
-            onPressed: () => _edit(catalog),
+            onPressed: _edit,
           ),
         ],
       ),
@@ -113,21 +109,13 @@ class _MaintenanceOperationDetailPageState
               child: Text('Aucun poste.', style: TextStyle(color: colors.textMuted)),
             )
           else
-            ...lines.map((l) {
-              final name = l.catalogItemId != null
-                  ? (catalogById[l.catalogItemId!.value]?.name ?? 'Poste')
-                  : (l.label ?? 'Poste');
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: Icon(
-                  l.catalogItemId != null ? Icons.bookmark_added_outlined : Icons.edit_note,
-                  color: colors.textMuted,
-                ),
-                title: Text(name),
-                trailing: Text(formatEur(l.cost)),
-              );
-            }),
+            ...lines.map((l) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: Icon(Icons.build_outlined, color: colors.textMuted),
+                  title: Text(l.label),
+                  trailing: Text(formatEur(l.cost)),
+                )),
           const Divider(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

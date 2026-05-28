@@ -536,52 +536,6 @@ final class PlansFamily extends $Family
   String toString() => r'plansProvider';
 }
 
-/// Catalogue de postes de l'utilisateur (trié par nom).
-
-@ProviderFor(catalogItems)
-final catalogItemsProvider = CatalogItemsProvider._();
-
-/// Catalogue de postes de l'utilisateur (trié par nom).
-
-final class CatalogItemsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<CatalogItem>>,
-          List<CatalogItem>,
-          FutureOr<List<CatalogItem>>
-        >
-    with
-        $FutureModifier<List<CatalogItem>>,
-        $FutureProvider<List<CatalogItem>> {
-  /// Catalogue de postes de l'utilisateur (trié par nom).
-  CatalogItemsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'catalogItemsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$catalogItemsHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<List<CatalogItem>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<CatalogItem>> create(Ref ref) {
-    return catalogItems(ref);
-  }
-}
-
-String _$catalogItemsHash() => r'7d073ad3bc7771faaebc25b1321be8673f3493ec';
-
 @ProviderFor(tirePressures)
 final tirePressuresProvider = TirePressuresFamily._();
 

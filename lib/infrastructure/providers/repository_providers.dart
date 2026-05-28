@@ -2,7 +2,6 @@ import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
@@ -32,10 +31,6 @@ SyncableRepository<Vehicle> vehicleRepository(Ref ref) => _build(ref, vehicleCod
 
 @riverpod
 SyncableRepository<FuelEntry> fuelRepository(Ref ref) => _build(ref, fuelEntryCodec);
-
-@riverpod
-SyncableRepository<CatalogItem> catalogItemRepository(Ref ref) =>
-    _build(ref, catalogItemCodec);
 
 @riverpod
 SyncableRepository<Operation> operationRepository(Ref ref) => _build(ref, operationCodec);

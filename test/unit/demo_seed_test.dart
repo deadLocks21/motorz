@@ -28,8 +28,6 @@ void main() {
     expect(mustang.ownerUserId, owner, reason: 'le seed est rattaché au compte connecté');
 
     final fuel = (await store.query('fuel_entries')).map(fuelEntryCodec.fromJson).toList();
-    final catalog =
-        (await store.query('maintenance_catalog_items')).map(catalogItemCodec.fromJson).toList();
     final operations =
         (await store.query('maintenance_operations')).map(operationCodec.fromJson).toList();
     final lines = (await store.query('maintenance_operation_lines'))
@@ -38,10 +36,9 @@ void main() {
     final plans = (await store.query('maintenance_plans')).map(planCodec.fromJson).toList();
 
     expect(fuel, hasLength(8));
-    expect(catalog, hasLength(7));
     expect(operations, hasLength(3));
     expect(lines, hasLength(5));
-    expect(plans, hasLength(3));
+    expect(plans, hasLength(4));
 
     // « Elle a 12 567 km » = MAX(odometer) de toutes les saisies.
     expect(
