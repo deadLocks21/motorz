@@ -177,7 +177,7 @@ final class FuelEntriesProvider
   }
 }
 
-String _$fuelEntriesHash() => r'57f0f27e35090154ed656875fb6e6742fed56cab';
+String _$fuelEntriesHash() => r'a02a94de43a3a69f83ea0e61198107d113299f66';
 
 final class FuelEntriesFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<FuelEntry>>, String> {
@@ -196,6 +196,62 @@ final class FuelEntriesFamily extends $Family
   @override
   String toString() => r'fuelEntriesProvider';
 }
+
+/// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
+/// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
+/// « total »), la plus fréquente d'abord pour que les stations habituelles
+/// remontent en tête.
+
+@ProviderFor(knownStations)
+final knownStationsProvider = KnownStationsProvider._();
+
+/// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
+/// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
+/// « total »), la plus fréquente d'abord pour que les stations habituelles
+/// remontent en tête.
+
+final class KnownStationsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<String>>,
+          List<String>,
+          FutureOr<List<String>>
+        >
+    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+  /// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
+  /// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
+  /// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
+  /// « total »), la plus fréquente d'abord pour que les stations habituelles
+  /// remontent en tête.
+  KnownStationsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'knownStationsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$knownStationsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<String>> create(Ref ref) {
+    return knownStations(ref);
+  }
+}
+
+String _$knownStationsHash() => r'6ff8c9d7c41c93f2fc21a356c3e9470ccf475eda';
 
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 
@@ -1382,7 +1438,7 @@ final class DuePlansProvider
   }
 }
 
-String _$duePlansHash() => r'32e4a226d017680eb664e426ab76e5a4ae247f4a';
+String _$duePlansHash() => r'8b8a36f5ea2baf1567d03f4368fb5cd18ca86610';
 
 /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
 /// Projection pure : plans + historique (dernière réalisation dérivée).

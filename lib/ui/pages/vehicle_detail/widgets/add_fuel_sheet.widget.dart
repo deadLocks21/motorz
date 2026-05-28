@@ -5,6 +5,7 @@ import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
+import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
@@ -29,7 +30,6 @@ Future<void> showAddFuelSheet(
   required String vehicleId,
   int? lastOdometer,
   FuelType? defaultFuelType,
-  FuelEntry? duplicateOf,
   FuelEntry? existing,
 }) {
   return showModalBottomSheet<void>(
@@ -40,7 +40,6 @@ Future<void> showAddFuelSheet(
       vehicleId: vehicleId,
       lastOdometer: lastOdometer,
       defaultFuelType: defaultFuelType,
-      duplicateOf: duplicateOf,
       existing: existing,
     ),
   );
@@ -51,17 +50,12 @@ class _AddFuelSheet extends ConsumerStatefulWidget {
     required this.vehicleId,
     this.lastOdometer,
     this.defaultFuelType,
-    this.duplicateOf,
     this.existing,
   });
 
   final String vehicleId;
   final int? lastOdometer;
   final FuelType? defaultFuelType;
-
-  /// Pré-remplit la station « comme la dernière fois » (§5.8) ; le volume et le
-  /// prix changent à chaque plein, on les laisse à saisir.
-  final FuelEntry? duplicateOf;
 
   /// Plein à modifier (mode édition). Null → création d'un nouveau plein.
   final FuelEntry? existing;
@@ -75,6 +69,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
   final _volume = TextEditingController();
   final _price = TextEditingController();
   final _station = TextEditingController();
+  final _stationFocus = FocusNode();
 
   /// Date du plein — par défaut aujourd'hui, modifiable (saisie a posteriori) et
   /// effaçable : un plein peut être saisi avec seulement le kilométrage.
@@ -95,11 +90,9 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
       if (ex.volumeLiters != null) _volume.text = _fmtInput(ex.volumeLiters!);
       if (ex.pricePerLiter != null) _price.text = _fmtInput(ex.pricePerLiter!);
       if (ex.station != null) _station.text = ex.station!;
-    } else if (widget.duplicateOf?.station != null) {
-      // On garde uniquement la station de la dernière fois ; volume et prix se
-      // tapent à chaque plein.
-      _station.text = widget.duplicateOf!.station!;
     }
+    // Nouveau plein : champs vides — la station se choisit dans la liste
+    // déroulante des stations déjà saisies (pas de préremplissage automatique).
     // Total initial (mode édition) — calcul direct, setState interdit ici.
     final v0 = _num(_volume.text);
     final p0 = _num(_price.text);
@@ -132,6 +125,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     for (final c in [_odo, _volume, _price, _station]) {
       c.dispose();
     }
+    _stationFocus.dispose();
     super.dispose();
   }
 
@@ -170,10 +164,57 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Champ « Station ». Tant qu'aucune station n'a été saisie, simple champ
+  /// texte. Dès qu'on en a, autocomplétion sur les stations déjà connues
+  /// ([stations]) : la liste s'ouvre au focus (chevron) et se filtre à la
+  /// frappe, tout en laissant taper une station inédite. Même contrôleur et même
+  /// focus dans les deux cas pour que [_save] lise toujours la valeur.
+  Widget _stationField(List<String> stations) {
+    const decoration = InputDecoration(labelText: 'Station (optionnel)');
+    if (stations.isEmpty) {
+      return TextField(
+        key: const Key('fuelStationField'),
+        controller: _station,
+        focusNode: _stationFocus,
+        textCapitalization: TextCapitalization.words,
+        decoration: decoration,
+      );
+    }
+    return Autocomplete<String>(
+      textEditingController: _station,
+      focusNode: _stationFocus,
+      // Le champ est en bas de la feuille : la liste s'ouvre vers le haut pour
+      // ne pas passer sous le clavier.
+      optionsViewOpenDirection: OptionsViewOpenDirection.up,
+      optionsBuilder: (value) {
+        final q = value.text.trim().toLowerCase();
+        if (q.isEmpty) return stations; // focus champ vide → tout proposer
+        final matches = stations.where((s) => s.toLowerCase().contains(q)).toList();
+        // Après une sélection, la saisie == l'option : inutile de garder un menu
+        // d'un seul item identique.
+        if (matches.length == 1 && matches.first.toLowerCase() == q) {
+          return const Iterable<String>.empty();
+        }
+        return matches;
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextField(
+          key: const Key('fuelStationField'),
+          controller: controller,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.words,
+          decoration: decoration.copyWith(suffixIcon: const Icon(Icons.arrow_drop_down)),
+          onSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = widget.existing != null;
+    final stations = ref.watch(knownStationsProvider).value ?? const <String>[];
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: Column(
@@ -249,11 +290,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _station,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Station (optionnel)'),
-          ),
+          _stationField(stations),
           const SizedBox(height: 20),
           FilledButton(
             key: const Key('saveFuelButton'),

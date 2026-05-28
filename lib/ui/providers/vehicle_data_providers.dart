@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/finance.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
@@ -50,6 +51,58 @@ Future<List<FuelEntry>> fuelEntries(Ref ref, String vehicleId) async {
     return b.date!.compareTo(a.date!);
   });
   return list;
+}
+
+/// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
+/// soit le véhicule). Voir [rankStations] pour l'ordre.
+@riverpod
+Future<List<String>> knownStations(Ref ref) async {
+  ref.watch(storeChangesProvider);
+  return rankStations(await ref.watch(fuelRepositoryProvider).listAll());
+}
+
+/// Ordonne pour l'autocomplétion **toutes** les stations connues de [entries]
+/// (pas seulement les récentes) par nombre d'occurrences sur les **10 derniers
+/// pleins** (les stations habituelles du moment remontent), puis par fréquence
+/// globale et enfin alphabétiquement pour départager. Dédoublonnage sans tenir
+/// compte de la casse (« Total » / « total »), l'orthographe affichée étant la
+/// première vue.
+@visibleForTesting
+List<String> rankStations(List<FuelEntry> entries) {
+  // 10 derniers pleins par date décroissante ; ceux sans date (km seul) en
+  // dernier car non situables dans le temps.
+  final byRecency = [...entries]..sort((a, b) {
+      final da = a.date, db = b.date;
+      if (da == null) return db == null ? 0 : 1;
+      if (db == null) return -1;
+      return db.compareTo(da);
+    });
+  final recent = <String, int>{}; // occurrences sur les 10 derniers pleins
+  for (final e in byRecency.take(10)) {
+    final key = e.station?.trim().toLowerCase();
+    if (key == null || key.isEmpty) continue;
+    recent.update(key, (n) => n + 1, ifAbsent: () => 1);
+  }
+
+  final total = <String, int>{}; // fréquence globale (départage)
+  final labels = <String, String>{}; // clé normalisée → orthographe affichée
+  for (final e in entries) {
+    final raw = e.station?.trim();
+    if (raw == null || raw.isEmpty) continue;
+    final key = raw.toLowerCase();
+    total.update(key, (n) => n + 1, ifAbsent: () => 1);
+    labels.putIfAbsent(key, () => raw);
+  }
+
+  final keys = labels.keys.toList()
+    ..sort((a, b) {
+      final byRecent = (recent[b] ?? 0).compareTo(recent[a] ?? 0);
+      if (byRecent != 0) return byRecent;
+      final byTotal = total[b]!.compareTo(total[a]!);
+      return byTotal != 0 ? byTotal : a.compareTo(b);
+    });
+  return [for (final k in keys) labels[k]!];
 }
 
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).

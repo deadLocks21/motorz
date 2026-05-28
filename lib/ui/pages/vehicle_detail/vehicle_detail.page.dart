@@ -87,15 +87,11 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
 
   Future<void> _onFab() async {
     final odo = await ref.read(currentOdometerProvider(_id).future);
-    final fuel = await ref.read(fuelEntriesProvider(_id).future);
     if (!mounted) return;
     switch (_tab.index) {
       case 1:
         await showAddFuelSheet(context, ref,
-            vehicleId: _id,
-            lastOdometer: odo,
-            defaultFuelType: widget.vehicle.fuelType,
-            duplicateOf: fuel.isNotEmpty ? fuel.first : null);
+            vehicleId: _id, lastOdometer: odo, defaultFuelType: widget.vehicle.fuelType);
       case 2:
         await showAddOperationSheet(context, ref, vehicleId: _id, lastOdometer: odo);
       case 3:
