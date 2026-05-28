@@ -263,7 +263,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   Widget _lineCard(int i) {
     final d = _lines[i];
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         children: [
           Row(
@@ -273,9 +273,8 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
                   controller: d.labelCtrl,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
-                    labelText: 'Poste',
+                    labelText: 'Pièce',
                     hintText: 'Vidange, Plaquettes…',
-                    isDense: true,
                   ),
                 ),
               ),
@@ -287,13 +286,14 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: d.partsCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Pièces', suffixText: '€', isDense: true),
+                  decoration: const InputDecoration(labelText: 'Prix', suffixText: '€'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -301,8 +301,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
                 child: TextField(
                   controller: d.laborCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                      const InputDecoration(labelText: 'Main d\'œuvre', suffixText: '€', isDense: true),
+                  decoration: const InputDecoration(labelText: 'Main d\'œuvre', suffixText: '€'),
                 ),
               ),
             ],
