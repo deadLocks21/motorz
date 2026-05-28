@@ -77,12 +77,13 @@ Stream<bool> connectivityStatus(Ref ref) => ref.watch(connectivityServiceProvide
 
 @Riverpod(keepAlive: true)
 SessionRepository sessionRepository(Ref ref) {
-  // Web ou mode démo (memory) : pas de backend réel, la session est jetable et
-  // vit en mémoire. Sinon, persistance locale via `shared_preferences`
-  // (stockage non chiffré — cf. SharedPreferencesSessionRepository).
-  if (kIsWeb || isMemoryMode(ref.watch(apiBaseUrlProvider))) {
-    return InMemorySessionRepository();
-  }
+  // Web : pas d'accès disque fiable, la session reste en mémoire (jetable).
+  // Mobile/desktop, y compris en mode démo (memory) : persistance locale via
+  // `shared_preferences` (stockage non chiffré — cf.
+  // SharedPreferencesSessionRepository) pour survivre aux hot restart. En démo
+  // le JWT est factice et l'identité (cf. InMemoryAuthRepository._demoUserId)
+  // est déterministe, donc la session persistée reste cohérente avec le seed.
+  if (kIsWeb) return InMemorySessionRepository();
   return SharedPreferencesSessionRepository();
 }
 
