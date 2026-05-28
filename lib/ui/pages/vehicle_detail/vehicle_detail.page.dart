@@ -501,7 +501,7 @@ class _FuelTab extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.local_gas_station, color: colors.accent),
                 title: Text('${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}'),
-                subtitle: Text('${formatDate(e.date)}${e.station != null ? ' · ${e.station}' : ''}'),
+                subtitle: Text('${formatDateOrNull(e.date)}${e.station != null ? ' · ${e.station}' : ''}'),
                 trailing: Text(formatEur(e.totalCost), style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             );
@@ -553,7 +553,7 @@ class _FuelTab extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Supprimer ce plein ?'),
-        content: Text('${formatDate(entry.date)} · ${formatKm(entry.odometer)}'
+        content: Text('${formatDateOrNull(entry.date)} · ${formatKm(entry.odometer)}'
             '${entry.volumeLiters != null ? ' · ${formatLiters(entry.volumeLiters)}' : ''}\n'
             'Cette action est définitive.'),
         actions: [

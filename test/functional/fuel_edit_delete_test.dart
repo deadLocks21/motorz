@@ -112,6 +112,62 @@ void main() {
     expect((rows.first['odometer'] as num).toInt(), 100123);
   });
 
+  testWidgets('nouveau plein avec km seul (date effacée) est enregistré', (tester) async {
+    final (store, vehicleId) = await seed();
+    await pumpFuelTab(tester, store, vehicleId);
+
+    // + → feuille « Nouveau plein » (date par défaut = aujourd'hui).
+    await tester.tap(find.byKey(const Key('detailFab')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nouveau plein'), findsOneWidget);
+
+    // Efface la date, saisit uniquement le kilométrage.
+    await tester.tap(find.byKey(const Key('fuelDateClearButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Aucune (km seul)'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('fuelOdometerField')), '100200');
+    await tester.tap(find.byKey(const Key('saveFuelButton')));
+    await tester.pumpAndSettle();
+
+    final rows = await store.query('fuel_entries');
+    final added = rows.firstWhere((r) => (r['odometer'] as num?)?.toInt() == 100200);
+    expect(added['date'], isNull, reason: 'km seul → pas de date');
+  });
+
+  testWidgets('nouveau plein avec date seule (km effacé) est enregistré', (tester) async {
+    final (store, vehicleId) = await seed();
+    await pumpFuelTab(tester, store, vehicleId);
+
+    await tester.tap(find.byKey(const Key('detailFab')));
+    await tester.pumpAndSettle();
+
+    // Efface le kilométrage pré-rempli, garde la date par défaut.
+    await tester.enterText(find.byKey(const Key('fuelOdometerField')), '');
+    await tester.tap(find.byKey(const Key('saveFuelButton')));
+    await tester.pumpAndSettle();
+
+    final rows = await store.query('fuel_entries');
+    final added = rows.firstWhere((r) => r['odometer'] == null);
+    expect(added['date'], isNotNull, reason: 'date seule → km absent');
+  });
+
+  testWidgets('refus si ni km ni date', (tester) async {
+    final (store, vehicleId) = await seed();
+    await pumpFuelTab(tester, store, vehicleId);
+
+    await tester.tap(find.byKey(const Key('detailFab')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('fuelDateClearButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('fuelOdometerField')), '');
+    await tester.tap(find.byKey(const Key('saveFuelButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Indique au moins le kilométrage ou la date.'), findsOneWidget);
+    expect((await store.query('fuel_entries')).length, 1, reason: 'aucun plein ajouté');
+  });
+
   testWidgets('clic droit → Supprimer demande confirmation puis retire le plein', (tester) async {
     final (store, vehicleId) = await seed();
     await pumpFuelTab(tester, store, vehicleId);

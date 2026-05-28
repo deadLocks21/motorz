@@ -14,4 +14,5 @@ String formatConsumption(double? v) => v == null ? '—' : '${_dec1.format(v)} L
 String formatPricePerLiter(double? v) => v == null ? '—' : '${_dec2.format(v)} €/L';
 String formatBar(double? v) => v == null ? '—' : '${_dec1.format(v)} bar';
 String formatDate(DateTime d) => DateFormat('dd/MM/yyyy').format(d.toLocal());
+String formatDateOrNull(DateTime? d) => d == null ? '—' : formatDate(d);
 String formatDateTime(DateTime d) => DateFormat('dd/MM/yyyy HH:mm').format(d.toLocal());

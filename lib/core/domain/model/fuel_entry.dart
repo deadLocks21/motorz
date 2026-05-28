@@ -7,8 +7,11 @@ class FuelEntry {
   final UuidValue id;
   final UuidValue vehicleId;
   final UuidValue? createdByUserId;
-  final DateTime date;
-  final int odometer;
+  /// Date du plein. Optionnelle : un plein peut être saisi avec seulement le
+  /// kilométrage (au moins l'un des deux — date ou odometer — est renseigné).
+  final DateTime? date;
+  /// Kilométrage au plein. Optionnel (cf. [date]).
+  final int? odometer;
   final double? volumeLiters;
   final double? pricePerLiter;
   final double? totalCost;
@@ -21,9 +24,9 @@ class FuelEntry {
   FuelEntry({
     required this.id,
     required this.vehicleId,
-    required this.date,
-    required this.odometer,
     required this.updatedAt,
+    this.date,
+    this.odometer,
     this.createdByUserId,
     this.volumeLiters,
     this.pricePerLiter,
@@ -32,7 +35,9 @@ class FuelEntry {
     this.station,
     this.notes,
     this.deletedAt,
-  }) : assert(odometer >= 0, 'odometer must be >= 0');
+  })  : assert(odometer == null || odometer >= 0, 'odometer must be >= 0'),
+        assert(date != null || odometer != null,
+            'au moins la date ou le kilométrage doit être renseigné');
 
   FuelEntry copyWith({
     DateTime? date,

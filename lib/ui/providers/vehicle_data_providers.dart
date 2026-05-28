@@ -42,7 +42,13 @@ Future<Vehicle?> vehicleById(Ref ref, String vehicleId) async {
 Future<List<FuelEntry>> fuelEntries(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
   final list = await ref.watch(fuelRepositoryProvider).listForVehicle(vehicleId);
-  list.sort((a, b) => b.date.compareTo(a.date));
+  // Pleins sans date (km seul) en tête pour penser à les compléter ; le reste
+  // par date décroissante.
+  list.sort((a, b) {
+    if (a.date == null) return b.date == null ? 0 : -1;
+    if (b.date == null) return 1;
+    return b.date!.compareTo(a.date!);
+  });
   return list;
 }
 

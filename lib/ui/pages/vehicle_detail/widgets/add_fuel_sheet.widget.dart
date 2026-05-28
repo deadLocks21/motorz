@@ -76,8 +76,9 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
   final _price = TextEditingController();
   final _station = TextEditingController();
 
-  /// Date du plein — par défaut aujourd'hui, modifiable (saisie a posteriori).
-  DateTime _date = DateTime.now();
+  /// Date du plein — par défaut aujourd'hui, modifiable (saisie a posteriori) et
+  /// effaçable : un plein peut être saisi avec seulement le kilométrage.
+  DateTime? _date = DateTime.now();
 
   /// Total calculé (volume × prix/L), affiché en lecture seule — jamais saisi.
   double? _total;
@@ -90,7 +91,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     _odo = TextEditingController(text: (ex?.odometer ?? widget.lastOdometer)?.toString() ?? '');
     if (ex != null) {
       // Mode édition : on repart de toutes les valeurs de l'entrée.
-      _date = ex.date.toLocal();
+      _date = ex.date?.toLocal();
       if (ex.volumeLiters != null) _volume.text = _fmtInput(ex.volumeLiters!);
       if (ex.pricePerLiter != null) _price.text = _fmtInput(ex.pricePerLiter!);
       if (ex.station != null) _station.text = ex.station!;
@@ -117,7 +118,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date,
+      initialDate: _date ?? now,
       firstDate: DateTime(now.year - 5),
       // Fin de journée : autorise aujourd'hui quelle que soit l'heure, et évite
       // qu'en édition une date stockée à midi ne dépasse `lastDate` avant midi.
@@ -136,16 +137,18 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
 
   Future<void> _save() async {
     final odo = int.tryParse(_odo.text.trim());
-    if (odo == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Indique le kilométrage.')));
+    // Au moins le kilométrage OU la date doit être renseigné.
+    if (odo == null && _date == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Indique au moins le kilométrage ou la date.')));
       return;
     }
     setState(() => _saving = true);
     final volume = _num(_volume.text);
     final price = _num(_price.text);
     // Midi local pour éviter qu'un décalage de fuseau ne change le jour saisi.
-    final date = DateTime(_date.year, _date.month, _date.day, 12);
+    final d = _date;
+    final date = d == null ? null : DateTime(d.year, d.month, d.day, 12);
     final ex = widget.existing;
     // En édition on conserve l'identité (id, véhicule, créateur) et les champs
     // non éditables ici (type de carburant, notes) ; sinon on génère un plein neuf.
@@ -153,7 +156,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
       id: ex?.id ?? UuidValue.generate(),
       vehicleId: ex?.vehicleId ?? UuidValue.parse(widget.vehicleId),
       createdByUserId: ex?.createdByUserId,
-      date: date.toUtc(),
+      date: date?.toUtc(),
       odometer: odo,
       volumeLiters: volume,
       pricePerLiter: price,
@@ -181,15 +184,29 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           InputDecorator(
-            decoration: const InputDecoration(labelText: 'Date'),
+            decoration: const InputDecoration(labelText: 'Date (optionnel)'),
             child: InkWell(
               key: const Key('fuelDateField'),
               onTap: _pickDate,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(formatDate(_date)),
-                  const Icon(Icons.calendar_today_outlined, size: 18),
+                  Text(
+                    _date == null ? 'Aucune (km seul)' : formatDate(_date!),
+                    style: _date == null
+                        ? TextStyle(color: Theme.of(context).hintColor)
+                        : null,
+                  ),
+                  if (_date == null)
+                    const Icon(Icons.calendar_today_outlined, size: 18)
+                  else
+                    IconButton(
+                      key: const Key('fuelDateClearButton'),
+                      icon: const Icon(Icons.clear, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Effacer la date',
+                      onPressed: () => setState(() => _date = null),
+                    ),
                 ],
               ),
             ),

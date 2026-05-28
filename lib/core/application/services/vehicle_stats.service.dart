@@ -11,7 +11,7 @@ abstract final class VehicleStatsService {
     List<TirePressureEntry> tires = const [],
   }) {
     final odos = <int>[
-      ...fuel.map((e) => e.odometer),
+      ...fuel.map((e) => e.odometer).whereType<int>(),
       ...operations.map((e) => e.odometer),
       ...tires.map((e) => e.odometer),
     ];
@@ -22,10 +22,12 @@ abstract final class VehicleStatsService {
   /// Consommation moyenne (L/100 km) sur la plage de km couverte par les pleins
   /// renseignés en volume. Approximation assumée (cf. brief §5.3).
   static double? averageConsumption(List<FuelEntry> fuel) {
-    final withVolume = fuel.where((e) => e.volumeLiters != null).toList()
-      ..sort((a, b) => a.odometer.compareTo(b.odometer));
+    final withVolume = fuel
+        .where((e) => e.volumeLiters != null && e.odometer != null)
+        .toList()
+      ..sort((a, b) => a.odometer!.compareTo(b.odometer!));
     if (withVolume.length < 2) return null;
-    final distance = withVolume.last.odometer - withVolume.first.odometer;
+    final distance = withVolume.last.odometer! - withVolume.first.odometer!;
     if (distance <= 0) return null;
     // On ne compte pas le volume du premier plein (il a rempli avant la plage).
     final volume = withVolume.skip(1).fold<double>(0, (s, e) => s + (e.volumeLiters ?? 0));

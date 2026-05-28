@@ -73,7 +73,9 @@ abstract final class FinanceService {
     double opCost(Operation o) =>
         MaintenanceDerivationService.operationCost(linesByOp[o.id.value] ?? const []) ?? 0;
 
-    final fuelCost = fuel.where((e) => since(e.date)).fold<double>(0, (s, e) => s + (e.totalCost ?? 0));
+    final fuelCost = fuel
+        .where((e) => e.date == null || since(e.date!))
+        .fold<double>(0, (s, e) => s + (e.totalCost ?? 0));
     final opsList = operations.where((e) => since(e.date)).toList();
     final maintenanceCost = opsList.fold<double>(0, (s, e) => s + opCost(e));
     final otherCost = costs.where((e) => since(e.date)).fold<double>(0, (s, e) => s + (e.amount ?? 0));
