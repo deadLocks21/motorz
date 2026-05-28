@@ -5,6 +5,7 @@ import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
+import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) {
@@ -77,6 +78,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   late final TextEditingController _odo;
   late final TextEditingController _title;
   late final TextEditingController _provider;
+  final _providerFocus = FocusNode();
   late final TextEditingController _note;
   late DateTime _date;
   final List<_LineDraft> _lines = [];
@@ -104,6 +106,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     for (final c in [_odo, _title, _provider, _note]) {
       c.dispose();
     }
+    _providerFocus.dispose();
     for (final l in _lines) {
       l.dispose();
     }
@@ -178,6 +181,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final providers = ref.watch(knownProvidersProvider).value ?? const <String>[];
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: SingleChildScrollView(
@@ -192,6 +196,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               children: [
                 Expanded(
                   child: TextField(
+                    key: const Key('operationOdometerField'),
                     controller: _odo,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -218,10 +223,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _provider,
-              decoration: const InputDecoration(labelText: 'Prestataire', hintText: 'Garage / moi-même'),
-            ),
+            _providerField(providers),
             const SizedBox(height: 12),
             TextField(
               controller: _note,
@@ -251,12 +253,59 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
             ),
             const SizedBox(height: 16),
             FilledButton(
+              key: const Key('saveOperationButton'),
               onPressed: _saving ? null : _save,
               child: Text(_isEdit ? 'Enregistrer' : 'Enregistrer l\'opération'),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Champ « Prestataire ». Tant qu'aucun prestataire n'a été saisi, simple champ
+  /// texte. Dès qu'on en a, autocomplétion sur les prestataires déjà connus
+  /// ([providers]) : la liste s'ouvre au focus (chevron) et se filtre à la frappe,
+  /// tout en laissant taper un prestataire inédit. Même contrôleur et même focus
+  /// dans les deux cas pour que [_save] lise toujours la valeur. Calque du champ
+  /// « Station » d'un plein ; ici le champ est en haut de la feuille, la liste
+  /// s'ouvre donc vers le bas (défaut).
+  Widget _providerField(List<String> providers) {
+    const decoration =
+        InputDecoration(labelText: 'Prestataire', hintText: 'Garage / moi-même');
+    if (providers.isEmpty) {
+      return TextField(
+        key: const Key('operationProviderField'),
+        controller: _provider,
+        focusNode: _providerFocus,
+        textCapitalization: TextCapitalization.words,
+        decoration: decoration,
+      );
+    }
+    return Autocomplete<String>(
+      textEditingController: _provider,
+      focusNode: _providerFocus,
+      optionsBuilder: (value) {
+        final q = value.text.trim().toLowerCase();
+        if (q.isEmpty) return providers; // focus champ vide → tout proposer
+        final matches = providers.where((s) => s.toLowerCase().contains(q)).toList();
+        // Après une sélection, la saisie == l'option : inutile de garder un menu
+        // d'un seul item identique.
+        if (matches.length == 1 && matches.first.toLowerCase() == q) {
+          return const Iterable<String>.empty();
+        }
+        return matches;
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextField(
+          key: const Key('operationProviderField'),
+          controller: controller,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.words,
+          decoration: decoration.copyWith(suffixIcon: const Icon(Icons.arrow_drop_down)),
+          onSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
     );
   }
 

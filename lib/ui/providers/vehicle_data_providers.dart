@@ -105,6 +105,53 @@ List<String> rankStations(List<FuelEntry> entries) {
   return [for (final k in keys) labels[k]!];
 }
 
+/// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
+/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+@riverpod
+Future<List<String>> knownProviders(Ref ref) async {
+  ref.watch(storeChangesProvider);
+  return rankProviders(await ref.watch(operationRepositoryProvider).listAll());
+}
+
+/// Ordonne pour l'autocomplétion **tous** les prestataires connus de [operations]
+/// (pas seulement les récents) par nombre d'occurrences sur les **10 dernières
+/// opérations** (les garages habituels du moment remontent), puis par fréquence
+/// globale et enfin alphabétiquement pour départager. Dédoublonnage sans tenir
+/// compte de la casse (« Norauto » / « norauto »), l'orthographe affichée étant
+/// la première vue. Calque de [rankStations] ; la date d'une opération n'étant
+/// jamais nulle, le tri par récence est direct.
+@visibleForTesting
+List<String> rankProviders(List<Operation> operations) {
+  // 10 dernières opérations par date décroissante.
+  final byRecency = [...operations]..sort((a, b) => b.date.compareTo(a.date));
+  final recent = <String, int>{}; // occurrences sur les 10 dernières opérations
+  for (final o in byRecency.take(10)) {
+    final key = o.provider?.trim().toLowerCase();
+    if (key == null || key.isEmpty) continue;
+    recent.update(key, (n) => n + 1, ifAbsent: () => 1);
+  }
+
+  final total = <String, int>{}; // fréquence globale (départage)
+  final labels = <String, String>{}; // clé normalisée → orthographe affichée
+  for (final o in operations) {
+    final raw = o.provider?.trim();
+    if (raw == null || raw.isEmpty) continue;
+    final key = raw.toLowerCase();
+    total.update(key, (n) => n + 1, ifAbsent: () => 1);
+    labels.putIfAbsent(key, () => raw);
+  }
+
+  final keys = labels.keys.toList()
+    ..sort((a, b) {
+      final byRecent = (recent[b] ?? 0).compareTo(recent[a] ?? 0);
+      if (byRecent != 0) return byRecent;
+      final byTotal = total[b]!.compareTo(total[a]!);
+      return byTotal != 0 ? byTotal : a.compareTo(b);
+    });
+  return [for (final k in keys) labels[k]!];
+}
+
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 @riverpod
 Future<List<Operation>> operations(Ref ref, String vehicleId) async {

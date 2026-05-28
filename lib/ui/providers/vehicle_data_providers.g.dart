@@ -199,18 +199,14 @@ final class FuelEntriesFamily extends $Family
 
 /// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
 /// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
-/// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
-/// « total »), la plus fréquente d'abord pour que les stations habituelles
-/// remontent en tête.
+/// soit le véhicule). Voir [rankStations] pour l'ordre.
 
 @ProviderFor(knownStations)
 final knownStationsProvider = KnownStationsProvider._();
 
 /// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
 /// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
-/// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
-/// « total »), la plus fréquente d'abord pour que les stations habituelles
-/// remontent en tête.
+/// soit le véhicule). Voir [rankStations] pour l'ordre.
 
 final class KnownStationsProvider
     extends
@@ -222,9 +218,7 @@ final class KnownStationsProvider
     with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
   /// Stations déjà saisies, tous véhicules confondus — pour l'autocomplétion du
   /// champ « Station » d'un plein (on fait le plein aux mêmes endroits quel que
-  /// soit le véhicule). Dédoublonnées sans tenir compte de la casse (« Total » /
-  /// « total »), la plus fréquente d'abord pour que les stations habituelles
-  /// remontent en tête.
+  /// soit le véhicule). Voir [rankStations] pour l'ordre.
   KnownStationsProvider._()
     : super(
         from: null,
@@ -251,7 +245,57 @@ final class KnownStationsProvider
   }
 }
 
-String _$knownStationsHash() => r'6ff8c9d7c41c93f2fc21a356c3e9470ccf475eda';
+String _$knownStationsHash() => r'7fe2e1b695f2d19d324e760df8f014c60af2874d';
+
+/// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
+/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+
+@ProviderFor(knownProviders)
+final knownProvidersProvider = KnownProvidersProvider._();
+
+/// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
+/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
+/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+
+final class KnownProvidersProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<String>>,
+          List<String>,
+          FutureOr<List<String>>
+        >
+    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+  /// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
+  /// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
+  /// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+  KnownProvidersProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'knownProvidersProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$knownProvidersHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<String>> create(Ref ref) {
+    return knownProviders(ref);
+  }
+}
+
+String _$knownProvidersHash() => r'f07e3acec864aadec7259bf9e068e7177ebec151';
 
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 
