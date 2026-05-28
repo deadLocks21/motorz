@@ -1,8 +1,11 @@
 import 'package:intl/intl.dart';
 
-final _int = NumberFormat('#,##0');
-final _dec1 = NumberFormat('#,##0.0');
-final _dec2 = NumberFormat('#,##0.00');
+final _int = NumberFormat('#,##0', 'fr_FR');
+final _dec1 = NumberFormat('#,##0.0', 'fr_FR');
+final _dec2 = NumberFormat('#,##0.00', 'fr_FR');
+
+/// Nombre décimal (1 chiffre) au format FR (virgule décimale), sans unité.
+String formatDecimal1(double v) => _dec1.format(v);
 
 String formatKm(int? km) => km == null ? '—' : '${_int.format(km)} km';
 String formatEur(double? v) => v == null ? '—' : '${_dec2.format(v)} €';

@@ -107,7 +107,7 @@ class _LineCard extends StatelessWidget {
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
               if (average != null)
-                Text('moy. ${average!.toStringAsFixed(1)} $unit',
+                Text('moy. ${formatDecimal1(average!)} $unit',
                     style: TextStyle(color: colors.textMuted, fontSize: 12)),
             ],
           ),
@@ -145,7 +145,7 @@ class _LineCard extends StatelessWidget {
             showTitles: true,
             reservedSize: 36,
             getTitlesWidget: (v, _) =>
-                Text(v.toStringAsFixed(1), style: TextStyle(color: colors.textMuted, fontSize: 10)),
+                Text(formatDecimal1(v), style: TextStyle(color: colors.textMuted, fontSize: 10)),
           ),
         ),
       ),
