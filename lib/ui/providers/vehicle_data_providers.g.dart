@@ -297,6 +297,120 @@ final class KnownProvidersProvider
 
 String _$knownProvidersHash() => r'f07e3acec864aadec7259bf9e068e7177ebec151';
 
+/// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+/// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+/// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+/// on propose donc directement les échéances en attente plutôt que des postes
+/// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+/// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+/// l'ordre.
+
+@ProviderFor(knownPartLabels)
+final knownPartLabelsProvider = KnownPartLabelsFamily._();
+
+/// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+/// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+/// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+/// on propose donc directement les échéances en attente plutôt que des postes
+/// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+/// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+/// l'ordre.
+
+final class KnownPartLabelsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<String>>,
+          List<String>,
+          FutureOr<List<String>>
+        >
+    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+  /// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+  /// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+  /// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+  /// on propose donc directement les échéances en attente plutôt que des postes
+  /// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+  /// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+  /// l'ordre.
+  KnownPartLabelsProvider._({
+    required KnownPartLabelsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'knownPartLabelsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$knownPartLabelsHash();
+
+  @override
+  String toString() {
+    return r'knownPartLabelsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<String>> create(Ref ref) {
+    final argument = this.argument as String;
+    return knownPartLabels(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is KnownPartLabelsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$knownPartLabelsHash() => r'02908c3f25d3e65a031dd6b7fae41d49eb158fa4';
+
+/// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+/// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+/// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+/// on propose donc directement les échéances en attente plutôt que des postes
+/// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+/// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+/// l'ordre.
+
+final class KnownPartLabelsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<String>>, String> {
+  KnownPartLabelsFamily._()
+    : super(
+        retry: null,
+        name: r'knownPartLabelsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+  /// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+  /// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+  /// on propose donc directement les échéances en attente plutôt que des postes
+  /// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+  /// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+  /// l'ordre.
+
+  KnownPartLabelsProvider call(String vehicleId) =>
+      KnownPartLabelsProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'knownPartLabelsProvider';
+}
+
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 
 @ProviderFor(operations)

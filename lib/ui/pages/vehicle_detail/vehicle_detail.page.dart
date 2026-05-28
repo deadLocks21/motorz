@@ -628,6 +628,8 @@ class _TasksTab extends ConsumerWidget {
       data: (items) {
         // « À réaliser » : en retard / bientôt dû, ou tâche sans déclencheur
         // (ponctuelle à faire). « Prochaines échéances » : à venir (informatif).
+        // Même partition que `rankDueTitles` (suggestions du champ « Pièce ») :
+        // garder les deux synchronisées.
         final aRealiser = items
             .where((d) =>
                 d.due.status == DueStatus.overdue ||

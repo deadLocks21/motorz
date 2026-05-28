@@ -47,11 +47,16 @@ class _LineDraft {
 
   final UuidValue? existingId;
   final TextEditingController labelCtrl;
+
+  /// Focus propre au champ « Pièce » de la ligne (requis par l'`Autocomplete` des
+  /// suggestions d'échéances) : un par ligne pour que chaque liste s'ouvre seule.
+  final FocusNode labelFocus = FocusNode();
   final TextEditingController partsCtrl;
   final TextEditingController laborCtrl;
 
   void dispose() {
     labelCtrl.dispose();
+    labelFocus.dispose();
     partsCtrl.dispose();
     laborCtrl.dispose();
   }
@@ -182,6 +187,8 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final providers = ref.watch(knownProvidersProvider).value ?? const <String>[];
+    final partLabels =
+        ref.watch(knownPartLabelsProvider(widget.vehicleId)).value ?? const <String>[];
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: SingleChildScrollView(
@@ -241,7 +248,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
               style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
             ),
             const SizedBox(height: 8),
-            for (var i = 0; i < _lines.length; i++) _lineCard(i),
+            for (var i = 0; i < _lines.length; i++) _lineCard(i, partLabels),
             const SizedBox(height: 4),
             Align(
               alignment: Alignment.centerLeft,
@@ -309,24 +316,64 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     );
   }
 
-  Widget _lineCard(int i) {
+  /// Champ « Pièce » d'une ligne. Tant qu'aucune échéance n'est « À prévoir »,
+  /// simple champ texte. Dès qu'il y en a, autocomplétion sur leurs intitulés
+  /// ([partLabels], déjà ordonnés comme l'onglet À prévoir) : la liste s'ouvre au
+  /// focus (chevron) et se filtre à la frappe, tout en laissant saisir un poste
+  /// inédit. Saisir une ligne au même intitulé qu'une échéance la remet à zéro,
+  /// d'où la proposition directe des échéances en attente. Calque des champs
+  /// « Station »/« Prestataire » ; un contrôleur et un focus par ligne.
+  Widget _partLabelField(_LineDraft d, List<String> partLabels) {
+    const decoration = InputDecoration(
+      labelText: 'Pièce',
+      hintText: 'Vidange, Plaquettes…',
+    );
+    if (partLabels.isEmpty) {
+      return TextField(
+        controller: d.labelCtrl,
+        focusNode: d.labelFocus,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: decoration,
+      );
+    }
+    return Autocomplete<String>(
+      textEditingController: d.labelCtrl,
+      focusNode: d.labelFocus,
+      optionsBuilder: (value) {
+        final q = value.text.trim().toLowerCase();
+        if (q.isEmpty) return partLabels; // focus champ vide → tout proposer
+        final matches = partLabels.where((s) => s.toLowerCase().contains(q)).toList();
+        // Après une sélection, la saisie == l'option : inutile de garder un menu
+        // d'un seul item identique.
+        if (matches.length == 1 && matches.first.toLowerCase() == q) {
+          return const Iterable<String>.empty();
+        }
+        return matches;
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: decoration.copyWith(suffixIcon: const Icon(Icons.arrow_drop_down)),
+          onSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
+    );
+  }
+
+  Widget _lineCard(int i, List<String> partLabels) {
     final d = _lines[i];
     return Padding(
+      // Clé d'identité : chaque carte suit son brouillon (et donc l'état de son
+      // Autocomplete) lors des ajouts/retraits de lignes.
+      key: ValueKey(d),
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         children: [
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: d.labelCtrl,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Pièce',
-                    hintText: 'Vidange, Plaquettes…',
-                  ),
-                ),
-              ),
+              Expanded(child: _partLabelField(d, partLabels)),
               IconButton(
                 tooltip: 'Retirer',
                 icon: const Icon(Icons.close),

@@ -152,6 +152,43 @@ List<String> rankProviders(List<Operation> operations) {
   return [for (final k in keys) labels[k]!];
 }
 
+/// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
+/// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé
+/// qu'une échéance la remet à zéro (rapprochement par intitulé, cf. À prévoir) :
+/// on propose donc directement les échéances en attente plutôt que des postes
+/// déjà saisis. Contrairement aux stations/prestataires (tous véhicules
+/// confondus), les échéances sont propres au véhicule. Voir [rankDueTitles] pour
+/// l'ordre.
+@riverpod
+Future<List<String>> knownPartLabels(Ref ref, String vehicleId) async {
+  return rankDueTitles(await ref.watch(duePlansProvider(vehicleId).future));
+}
+
+/// Ordonne les intitulés d'échéances pour l'autocomplétion **dans l'ordre de
+/// l'onglet À prévoir** : d'abord celles « à réaliser » (en retard, bientôt dues,
+/// ou tâches ponctuelles sans déclencheur), puis les « prochaines échéances » (à
+/// venir avec déclencheur) — chaque groupe gardant l'ordre d'urgence de
+/// [duePlans]. Dédoublonnage insensible à la casse, première orthographe
+/// conservée. La partition « à réaliser / prochaines » est celle de `_TasksTab`
+/// (onglet À prévoir) : garder les deux synchronisées.
+@visibleForTesting
+List<String> rankDueTitles(List<DuePlan> items) {
+  bool isUpcomingScheduled(DuePlan d) =>
+      d.due.status == DueStatus.upcoming && d.due.hasTrigger;
+  final ordered = [
+    ...items.where((d) => !isUpcomingScheduled(d)), // « à réaliser »
+    ...items.where(isUpcomingScheduled), // « prochaines échéances »
+  ];
+  final seen = <String>{};
+  final result = <String>[];
+  for (final d in ordered) {
+    final raw = d.plan.title.trim();
+    if (raw.isEmpty) continue;
+    if (seen.add(raw.toLowerCase())) result.add(raw);
+  }
+  return result;
+}
+
 /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 @riverpod
 Future<List<Operation>> operations(Ref ref, String vehicleId) async {
