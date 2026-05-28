@@ -52,21 +52,41 @@ class DocumentsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
-    final media = ref.watch(mediaForOwnerProvider(vehicleId)).value ?? const [];
-    final baseUrl = ref.watch(apiBaseUrlProvider);
-    final session = ref.watch(currentSessionProvider);
-    final headers = session == null
-        ? const <String, String>{}
-        : {'Authorization': 'Bearer ${session.jwt}', 'X-Device-Id': session.device.id};
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
         Text('Factures, photos, carte grise, attestation… (stockés sur kDrive).',
             style: TextStyle(color: colors.textMuted, fontSize: 13)),
         const SizedBox(height: 12),
+        MediaGrid(ownerType: 'vehicle', ownerId: vehicleId),
+      ],
+    );
+  }
+}
+
+/// Grille de documents (photos/PDF) d'une cible polymorphe ([ownerType]/[ownerId]) :
+/// bouton d'ajout + vignettes + suppression. Réutilisée pour le véhicule (onglet
+/// Docs) et pour une opération d'entretien (factures).
+class MediaGrid extends ConsumerWidget {
+  const MediaGrid({super.key, required this.ownerType, required this.ownerId});
+  final String ownerType;
+  final String ownerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final media = ref.watch(mediaForOwnerProvider(ownerId)).value ?? const [];
+    final baseUrl = ref.watch(apiBaseUrlProvider);
+    final session = ref.watch(currentSessionProvider);
+    final headers = session == null
+        ? const <String, String>{}
+        : {'Authorization': 'Bearer ${session.jwt}', 'X-Device-Id': session.device.id};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         OutlinedButton.icon(
-          onPressed: () => uploadDocument(context, ref, ownerType: 'vehicle', ownerId: vehicleId),
+          onPressed: () => uploadDocument(context, ref, ownerType: ownerType, ownerId: ownerId),
           icon: const Icon(Icons.upload_file),
           label: const Text('Ajouter un document'),
         ),

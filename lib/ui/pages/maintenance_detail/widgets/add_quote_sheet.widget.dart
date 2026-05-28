@@ -6,18 +6,18 @@ import 'package:motorz/infrastructure/providers/repository_providers.dart';
 
 double? _num(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
 
-Future<void> showAddQuoteSheet(BuildContext context, WidgetRef ref, {required String eventId}) {
+Future<void> showAddQuoteSheet(BuildContext context, WidgetRef ref, {required String operationId}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _AddQuoteSheet(eventId: eventId),
+    builder: (_) => _AddQuoteSheet(operationId: operationId),
   );
 }
 
 class _AddQuoteSheet extends ConsumerStatefulWidget {
-  const _AddQuoteSheet({required this.eventId});
-  final String eventId;
+  const _AddQuoteSheet({required this.operationId});
+  final String operationId;
 
   @override
   ConsumerState<_AddQuoteSheet> createState() => _AddQuoteSheetState();
@@ -45,7 +45,7 @@ class _AddQuoteSheetState extends ConsumerState<_AddQuoteSheet> {
     setState(() => _saving = true);
     final quote = MaintenanceQuote(
       id: UuidValue.generate(),
-      maintenanceEventId: UuidValue.parse(widget.eventId),
+      operationId: UuidValue.parse(widget.operationId),
       source: source,
       amount: _num(_amount.text),
       updatedAt: DateTime.now().toUtc(),

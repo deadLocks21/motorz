@@ -5,7 +5,7 @@ import 'package:motorz/core/domain/model/uuid_value.dart';
 /// « tout en garage ».
 class MaintenanceQuote {
   final UuidValue id;
-  final UuidValue maintenanceEventId;
+  final UuidValue operationId;
   final String? source;
   final double? amount;
   final bool isSelected;
@@ -15,7 +15,7 @@ class MaintenanceQuote {
 
   MaintenanceQuote({
     required this.id,
-    required this.maintenanceEventId,
+    required this.operationId,
     required this.updatedAt,
     this.source,
     this.amount,
@@ -34,7 +34,7 @@ class MaintenanceQuote {
   }) {
     return MaintenanceQuote(
       id: id,
-      maintenanceEventId: maintenanceEventId,
+      operationId: operationId,
       source: source ?? this.source,
       amount: amount ?? this.amount,
       isSelected: isSelected ?? this.isSelected,

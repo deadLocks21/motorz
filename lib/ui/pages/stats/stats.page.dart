@@ -1,8 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/stats.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
@@ -16,14 +18,20 @@ class StatsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
     final fuel = ref.watch(fuelEntriesProvider(vehicleId)).value ?? const [];
-    final events = ref.watch(maintenanceEventsProvider(vehicleId)).value ?? const [];
+    final operations = ref.watch(operationsProvider(vehicleId)).value ?? const [];
+    final lines = ref.watch(linesForVehicleProvider(vehicleId)).value ?? const <OperationLine>[];
     final costs = ref.watch(costEntriesProvider(vehicleId)).value ?? const [];
 
     final conso = StatsService.consumptionSeries(fuel);
     final prices = StatsService.pricePerLiterSeries(fuel);
 
+    final linesByOp = <String, List<OperationLine>>{};
+    for (final l in lines) {
+      (linesByOp[l.operationId.value] ??= []).add(l);
+    }
     final totalFuel = fuel.fold<double>(0, (s, e) => s + (e.totalCost ?? 0));
-    final totalMaint = events.fold<double>(0, (s, e) => s + (e.effectiveCost ?? 0));
+    final totalMaint = operations.fold<double>(
+        0, (s, o) => s + (MaintenanceDerivationService.operationCost(linesByOp[o.id.value] ?? const []) ?? 0));
     final totalOther = costs.fold<double>(0, (s, e) => s + (e.amount ?? 0));
     final totalAll = totalFuel + totalMaint + totalOther;
 

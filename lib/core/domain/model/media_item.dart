@@ -4,7 +4,7 @@ import 'package:motorz/core/domain/model/uuid_value.dart';
 /// l'app affiche via le proxy authentifié `/media/:id`.
 class MediaItem {
   final UuidValue id;
-  final String ownerType; // vehicle | fuel_entry | maintenance_event | maintenance_quote
+  final String ownerType; // vehicle | fuel_entry | maintenance_operation | maintenance_quote
   final UuidValue ownerId;
   final String kind; // photo | pdf
   final String? contentType;

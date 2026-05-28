@@ -152,6 +152,22 @@ class SyncService {
     await syncNow();
   }
 
+  /// Vide tout l'état local — store, file en attente, dead-letter, curseur — sans
+  /// rien rapatrier. Contrairement à [resetToRemote], **s'applique même en mode
+  /// local-only** (`enabled == false`) : appelée à la déconnexion pour ne laisser
+  /// aucune donnée sur l'appareil (vie privée).
+  Future<void> purgeLocal() async {
+    if (_disposed) return;
+    await _lock.synchronized(() async {
+      await _queue.clear();
+      await _rejectedStore.clear();
+      await _cursor.clear();
+      await _store.clear();
+    });
+    _logger?.info('sync.purge');
+    await _refreshCounts(phase: SyncPhase.idle);
+  }
+
   /// Push (drain de la file) puis pull (delta). Best-effort : une erreur réseau
   /// laisse la file intacte et sera réessayée au prochain passage en ligne.
   Future<void> syncNow() async {

@@ -1,7 +1,8 @@
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 
-/// Échéance calculée d'une tâche : statut + temps/km restants.
+/// Échéance calculée d'un plan : statut + temps/km restants.
 class DueInfo {
   final DueStatus status;
   final int? remainingKm;
@@ -35,20 +36,27 @@ abstract final class DueStatusService {
 
   static int _daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
 
-  static DueInfo compute(MaintenanceTask task, {int? currentOdometer, DateTime? now}) {
+  /// Échéance d'un [plan] à partir de sa dernière réalisation [lastDone]
+  /// (dérivée de l'historique, cf. [MaintenanceDerivationService]). Plan récurrent
+  /// avec un historique → la prochaine échéance part de `lastDone` ; sinon on
+  /// garde l'amorce `due_date`/`due_odometer` (« à venir sans passé »).
+  static DueInfo compute(
+    Plan plan, {
+    LastDone? lastDone,
+    int? currentOdometer,
+    DateTime? now,
+  }) {
     final ref = now ?? DateTime.now();
 
-    int? dueOdometer = task.dueOdometer;
-    DateTime? dueDate = _parseDate(task.dueDate);
+    int? dueOdometer = plan.dueOdometer;
+    DateTime? dueDate = _parseDate(plan.dueDate);
 
-    // Périodique : prochaine échéance depuis la dernière réalisation.
-    if (task.kind == TaskKind.periodic) {
-      if (task.intervalKm != null && task.lastDoneOdometer != null) {
-        dueOdometer = task.lastDoneOdometer! + task.intervalKm!;
+    if (plan.isRecurring && lastDone != null) {
+      if (plan.intervalKm != null) {
+        dueOdometer = lastDone.odometer + plan.intervalKm!;
       }
-      if (task.intervalMonths != null) {
-        final base = _parseDate(task.lastDoneDate) ?? ref;
-        dueDate = _addMonths(base, task.intervalMonths!);
+      if (plan.intervalMonths != null) {
+        dueDate = _addMonths(lastDone.date, plan.intervalMonths!);
       }
     }
 

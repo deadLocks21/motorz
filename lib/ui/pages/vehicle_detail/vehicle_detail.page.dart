@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
-import 'package:motorz/core/application/services/task_templates.dart';
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
-import 'package:motorz/core/domain/model/uuid_value.dart';
+import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/ui/pages/plans/plan_list.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dart';
-import 'package:motorz/ui/pages/vehicle_detail/widgets/add_maintenance_sheet.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_target_pressure_sheet.widget.dart';
-import 'package:motorz/ui/pages/vehicle_detail/widgets/add_task_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_tire_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
 import 'package:motorz/ui/pages/finances/finances.page.dart';
@@ -98,9 +100,9 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
             defaultFuelType: widget.vehicle.fuelType,
             duplicateOf: fuel.isNotEmpty ? fuel.first : null);
       case 2:
-        await showAddMaintenanceSheet(context, ref, vehicleId: _id, lastOdometer: odo);
+        await showAddOperationSheet(context, ref, vehicleId: _id, lastOdometer: odo);
       case 3:
-        await showAddTaskSheet(context, ref, vehicleId: _id);
+        await showPlanSheet(context, ref, vehicleId: _id);
       case 4:
         await showAddTireSheet(context, ref,
             vehicleId: _id, wheelCount: widget.vehicle.wheelCount, lastOdometer: odo);
@@ -197,6 +199,14 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
   }
 }
 
+/// Libellé d'un plan : nom du poste de catalogue, sinon titre, sinon défaut.
+String _planLabel(Plan p, Map<String, CatalogItem> catalogById) {
+  if (p.catalogItemId != null) {
+    return catalogById[p.catalogItemId!.value]?.name ?? 'Échéance';
+  }
+  return p.title ?? 'Échéance';
+}
+
 // ── Onglets ─────────────────────────────────────────────────────────────────
 
 class _OverviewTab extends ConsumerWidget {
@@ -211,7 +221,9 @@ class _OverviewTab extends ConsumerWidget {
     final odo = ref.watch(currentOdometerProvider(id)).value;
     final conso = ref.watch(averageConsumptionProvider(id)).value;
     final fuel = ref.watch(fuelEntriesProvider(id)).value ?? const [];
-    final due = ref.watch(dueTasksProvider(id)).value ?? const [];
+    final due = ref.watch(duePlansProvider(id)).value ?? const [];
+    final catalog = ref.watch(catalogItemsProvider).value ?? const [];
+    final catalogById = {for (final c in catalog) c.id.value: c};
     final upcoming = due.where((d) => d.due.hasTrigger).take(3).toList();
 
     return ListView(
@@ -269,7 +281,8 @@ class _OverviewTab extends ConsumerWidget {
         if (upcoming.isEmpty)
           Text('Rien à prévoir.', style: TextStyle(color: colors.textMuted))
         else
-          ...upcoming.map((d) => _DueRow(label: d.task.title, due: d.due, colors: colors)),
+          ...upcoming.map((d) =>
+              _DueRow(label: _planLabel(d.plan, catalogById), due: d.due, colors: colors)),
         if (isOwner) ...[
           const SizedBox(height: 24),
           OutlinedButton.icon(
@@ -473,28 +486,41 @@ class _MaintenanceTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
-    final async = ref.watch(maintenanceEventsProvider(vehicleId));
+    final async = ref.watch(operationsProvider(vehicleId));
+    final lines = ref.watch(linesForVehicleProvider(vehicleId)).value ?? const <OperationLine>[];
+    final catalog = ref.watch(catalogItemsProvider).value ?? const <CatalogItem>[];
+    final catalogById = {for (final c in catalog) c.id.value: c};
+    final linesByOp = <String, List<OperationLine>>{};
+    for (final l in lines) {
+      (linesByOp[l.operationId.value] ??= []).add(l);
+    }
+
     return async.when(
       skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur : $e')),
-      data: (events) {
-        if (events.isEmpty) return const _EmptyTab('Aucune opération d\'entretien enregistrée.');
+      data: (operations) {
+        if (operations.isEmpty) return const _EmptyTab('Aucune opération d\'entretien enregistrée.');
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-          itemCount: events.length,
+          itemCount: operations.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (_, i) {
-            final e = events[i];
+            final op = operations[i];
+            final opLines = linesByOp[op.id.value] ?? const [];
+            final title = op.title ?? MaintenanceDerivationService.deriveTitle(opLines, catalogById);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.build, color: colors.accent),
-              title: Text(e.title),
-              subtitle: Text('${formatDate(e.date)} · ${formatKm(e.odometer)}'
-                  '${e.provider != null ? ' · ${e.provider}' : ''}'),
-              trailing: Text(formatEur(e.effectiveCost), style: const TextStyle(fontWeight: FontWeight.w700)),
+              title: Text(title),
+              subtitle: Text('${formatDate(op.date)} · ${formatKm(op.odometer)}'
+                  '${op.provider != null ? ' · ${op.provider}' : ''}'),
+              trailing: Text(
+                formatEur(MaintenanceDerivationService.operationCost(opLines)),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => MaintenanceEventDetailPage(event: e)),
+                MaterialPageRoute(builder: (_) => MaintenanceOperationDetailPage(operation: op)),
               ),
             );
           },
@@ -511,7 +537,9 @@ class _TasksTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
-    final async = ref.watch(dueTasksProvider(vehicleId));
+    final async = ref.watch(duePlansProvider(vehicleId));
+    final catalog = ref.watch(catalogItemsProvider).value ?? const <CatalogItem>[];
+    final catalogById = {for (final c in catalog) c.id.value: c};
     return async.when(
       skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -520,62 +548,42 @@ class _TasksTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: [
-            Text('Modèles rapides', style: TextStyle(color: colors.textMuted, fontSize: 12)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: maintenanceTaskTemplates
-                  .map((t) => ActionChip(
-                        label: Text(t.title),
-                        avatar: const Icon(Icons.add, size: 16),
-                        onPressed: () => _addTemplate(ref, t),
-                      ))
-                  .toList(),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Prochaines échéances',
+                      style: Theme.of(context).textTheme.titleMedium),
+                ),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PlanListPage(vehicleId: vehicleId)),
+                  ),
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Gérer'),
+                ),
+              ],
             ),
-            const Divider(height: 24),
+            const SizedBox(height: 4),
             if (items.isEmpty)
-              Text('Rien à prévoir. Ajoute un modèle ci-dessus ou touche +.',
-                  style: TextStyle(color: colors.textMuted))
+              Text(
+                'Rien à prévoir. Les rappels apparaissent en saisissant une opération, '
+                'ou touche + pour une échéance à venir.',
+                style: TextStyle(color: colors.textMuted),
+              )
             else
-              ...items.map((d) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(d.task.title),
-                    subtitle: _DueRow(label: d.task.kind.label, due: d.due, colors: colors),
-                    trailing: d.task.kind == TaskKind.periodic
-                        ? TextButton(
-                            onPressed: () => _markDone(ref, d.task.vehicleId.value, d.task),
-                            child: const Text('Fait'))
-                        : null,
+              ...items.map((d) => InkWell(
+                    onTap: () => showPlanSheet(context, ref,
+                        vehicleId: vehicleId, existing: d.plan, catalogById: catalogById),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: _DueRow(
+                          label: _planLabel(d.plan, catalogById), due: d.due, colors: colors),
+                    ),
                   )),
           ],
         );
       },
     );
-  }
-
-  Future<void> _addTemplate(WidgetRef ref, TaskTemplate t) async {
-    final task = MaintenanceTask(
-      id: UuidValue.generate(),
-      vehicleId: UuidValue.parse(vehicleId),
-      title: t.title,
-      kind: t.kind,
-      category: t.category,
-      intervalKm: t.intervalKm,
-      intervalMonths: t.intervalMonths,
-      updatedAt: DateTime.now().toUtc(),
-    );
-    await ref.read(maintenanceTaskRepositoryProvider).save(task);
-  }
-
-  Future<void> _markDone(WidgetRef ref, String vehicleId, MaintenanceTask task) async {
-    final odo = await ref.read(currentOdometerProvider(vehicleId).future);
-    final updated = task.copyWith(
-      lastDoneDate: DateTime.now().toIso8601String().substring(0, 10),
-      lastDoneOdometer: odo,
-      updatedAt: DateTime.now().toUtc(),
-    );
-    await ref.read(maintenanceTaskRepositoryProvider).save(updated);
   }
 }
 

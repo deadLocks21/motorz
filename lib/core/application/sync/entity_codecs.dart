@@ -2,9 +2,11 @@ import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
@@ -103,26 +105,48 @@ final fuelEntryCodec = SyncCodec<FuelEntry>(
   },
 );
 
-final maintenanceEventCodec = SyncCodec<MaintenanceEvent>(
-  resource: 'maintenance_events',
+// Catalogue : scopé par utilisateur (pas de vehicle_id → vehicleIdOf null).
+final catalogItemCodec = SyncCodec<CatalogItem>(
+  resource: 'maintenance_catalog_items',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => null,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => CatalogItem(
+    id: _id(m['id']),
+    userId: _id(m['user_id']),
+    name: m['name'] as String,
+    defaultIntervalKm: intOrNull(m['default_interval_km']),
+    defaultIntervalMonths: intOrNull(m['default_interval_months']),
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'user_id': e.userId.value,
+    'name': e.name,
+    'default_interval_km': e.defaultIntervalKm,
+    'default_interval_months': e.defaultIntervalMonths,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+final operationCodec = SyncCodec<Operation>(
+  resource: 'maintenance_operations',
   idOf: (e) => e.id.value,
   vehicleIdOf: (e) => e.vehicleId.value,
   updatedAtOf: (e) => e.updatedAt,
   deletedAtOf: (e) => e.deletedAt,
-  fromJson: (m) => MaintenanceEvent(
+  fromJson: (m) => Operation(
     id: _id(m['id']),
     vehicleId: _id(m['vehicle_id']),
     createdByUserId: _idN(m['created_by_user_id']),
-    taskId: _idN(m['task_id']),
     date: parseDate(m['date']),
     odometer: (m['odometer'] as num).toInt(),
-    category: m['category'] as String?,
-    title: m['title'] as String,
-    description: m['description'] as String?,
-    partsCost: doubleOrNull(m['parts_cost']),
-    laborCost: doubleOrNull(m['labor_cost']),
-    totalCost: doubleOrNull(m['total_cost']),
+    title: m['title'] as String?,
     provider: m['provider'] as String?,
+    note: m['note'] as String?,
     countQuoteInEstimate: (m['count_quote_in_estimate'] as bool?) ?? true,
     updatedAt: parseDate(m['updated_at']),
     deletedAt: parseDateOrNull(m['deleted_at']),
@@ -131,68 +155,85 @@ final maintenanceEventCodec = SyncCodec<MaintenanceEvent>(
     'id': e.id.value,
     'vehicle_id': e.vehicleId.value,
     'created_by_user_id': e.createdByUserId?.value,
-    'task_id': e.taskId?.value,
     'date': e.date.toUtc().toIso8601String(),
     'odometer': e.odometer,
-    'category': e.category,
     'title': e.title,
-    'description': e.description,
-    'parts_cost': e.partsCost,
-    'labor_cost': e.laborCost,
-    'total_cost': e.totalCost,
     'provider': e.provider,
+    'note': e.note,
     'count_quote_in_estimate': e.countQuoteInEstimate,
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },
 );
 
-final maintenanceTaskCodec = SyncCodec<MaintenanceTask>(
-  resource: 'maintenance_tasks',
+// Lignes : scopées par operation_id (pas de vehicle_id → vehicleIdOf null,
+// résolu via l'opération parente, comme les devis).
+final operationLineCodec = SyncCodec<OperationLine>(
+  resource: 'maintenance_operation_lines',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => null,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => OperationLine(
+    id: _id(m['id']),
+    operationId: _id(m['operation_id']),
+    catalogItemId: _idN(m['catalog_item_id']),
+    label: m['label'] as String?,
+    partsCost: doubleOrNull(m['parts_cost']),
+    laborCost: doubleOrNull(m['labor_cost']),
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'operation_id': e.operationId.value,
+    'catalog_item_id': e.catalogItemId?.value,
+    'label': e.label,
+    'parts_cost': e.partsCost,
+    'labor_cost': e.laborCost,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+final planCodec = SyncCodec<Plan>(
+  resource: 'maintenance_plans',
   idOf: (e) => e.id.value,
   vehicleIdOf: (e) => e.vehicleId.value,
   updatedAtOf: (e) => e.updatedAt,
   deletedAtOf: (e) => e.deletedAt,
-  fromJson: (m) => MaintenanceTask(
+  fromJson: (m) => Plan(
     id: _id(m['id']),
     vehicleId: _id(m['vehicle_id']),
-    title: m['title'] as String,
-    description: m['description'] as String?,
-    kind: TaskKind.fromWire(m['kind'] as String),
-    category: m['category'] as String?,
+    catalogItemId: _idN(m['catalog_item_id']),
+    title: m['title'] as String?,
     priority: TaskPriority.fromWire(m['priority'] as String?),
     estimatedCost: doubleOrNull(m['estimated_cost']),
-    dueDate: m['due_date'] as String?,
-    dueOdometer: intOrNull(m['due_odometer']),
     intervalKm: intOrNull(m['interval_km']),
     intervalMonths: intOrNull(m['interval_months']),
-    lastDoneDate: m['last_done_date'] as String?,
-    lastDoneOdometer: intOrNull(m['last_done_odometer']),
+    dueDate: m['due_date'] as String?,
+    dueOdometer: intOrNull(m['due_odometer']),
     updatedAt: parseDate(m['updated_at']),
     deletedAt: parseDateOrNull(m['deleted_at']),
   ),
   toJson: (e) => {
     'id': e.id.value,
     'vehicle_id': e.vehicleId.value,
+    'catalog_item_id': e.catalogItemId?.value,
     'title': e.title,
-    'description': e.description,
-    'kind': e.kind.wire,
-    'category': e.category,
     'priority': e.priority?.wire,
     'estimated_cost': e.estimatedCost,
-    'due_date': e.dueDate,
-    'due_odometer': e.dueOdometer,
     'interval_km': e.intervalKm,
     'interval_months': e.intervalMonths,
-    'last_done_date': e.lastDoneDate,
-    'last_done_odometer': e.lastDoneOdometer,
+    'due_date': e.dueDate,
+    'due_odometer': e.dueOdometer,
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },
 );
 
-// Devis : scopés par maintenance_event_id (pas de vehicle_id → vehicleIdOf null,
-// le store les liste via listAll puis filtre par événement).
+// Devis : scopés par operation_id (pas de vehicle_id → vehicleIdOf null,
+// le store les liste via listAll puis filtre par opération).
 final maintenanceQuoteCodec = SyncCodec<MaintenanceQuote>(
   resource: 'maintenance_quotes',
   idOf: (e) => e.id.value,
@@ -201,7 +242,7 @@ final maintenanceQuoteCodec = SyncCodec<MaintenanceQuote>(
   deletedAtOf: (e) => e.deletedAt,
   fromJson: (m) => MaintenanceQuote(
     id: _id(m['id']),
-    maintenanceEventId: _id(m['maintenance_event_id']),
+    operationId: _id(m['operation_id']),
     source: m['source'] as String?,
     amount: doubleOrNull(m['amount']),
     isSelected: (m['is_selected'] as bool?) ?? false,
@@ -211,7 +252,7 @@ final maintenanceQuoteCodec = SyncCodec<MaintenanceQuote>(
   ),
   toJson: (e) => {
     'id': e.id.value,
-    'maintenance_event_id': e.maintenanceEventId.value,
+    'operation_id': e.operationId.value,
     'source': e.source,
     'amount': e.amount,
     'is_selected': e.isSelected,

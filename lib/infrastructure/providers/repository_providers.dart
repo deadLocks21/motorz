@@ -2,9 +2,11 @@ import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
@@ -32,12 +34,18 @@ SyncableRepository<Vehicle> vehicleRepository(Ref ref) => _build(ref, vehicleCod
 SyncableRepository<FuelEntry> fuelRepository(Ref ref) => _build(ref, fuelEntryCodec);
 
 @riverpod
-SyncableRepository<MaintenanceEvent> maintenanceEventRepository(Ref ref) =>
-    _build(ref, maintenanceEventCodec);
+SyncableRepository<CatalogItem> catalogItemRepository(Ref ref) =>
+    _build(ref, catalogItemCodec);
 
 @riverpod
-SyncableRepository<MaintenanceTask> maintenanceTaskRepository(Ref ref) =>
-    _build(ref, maintenanceTaskCodec);
+SyncableRepository<Operation> operationRepository(Ref ref) => _build(ref, operationCodec);
+
+@riverpod
+SyncableRepository<OperationLine> operationLineRepository(Ref ref) =>
+    _build(ref, operationLineCodec);
+
+@riverpod
+SyncableRepository<Plan> planRepository(Ref ref) => _build(ref, planCodec);
 
 @riverpod
 SyncableRepository<TirePressureEntry> tirePressureRepository(Ref ref) =>

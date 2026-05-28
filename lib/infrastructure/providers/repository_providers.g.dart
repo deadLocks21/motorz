@@ -105,105 +105,202 @@ final class FuelRepositoryProvider
 
 String _$fuelRepositoryHash() => r'841778c8de547aceb87fc847a556edecd3ec903a';
 
-@ProviderFor(maintenanceEventRepository)
-final maintenanceEventRepositoryProvider =
-    MaintenanceEventRepositoryProvider._();
+@ProviderFor(catalogItemRepository)
+final catalogItemRepositoryProvider = CatalogItemRepositoryProvider._();
 
-final class MaintenanceEventRepositoryProvider
+final class CatalogItemRepositoryProvider
     extends
         $FunctionalProvider<
-          SyncableRepository<MaintenanceEvent>,
-          SyncableRepository<MaintenanceEvent>,
-          SyncableRepository<MaintenanceEvent>
+          SyncableRepository<CatalogItem>,
+          SyncableRepository<CatalogItem>,
+          SyncableRepository<CatalogItem>
         >
-    with $Provider<SyncableRepository<MaintenanceEvent>> {
-  MaintenanceEventRepositoryProvider._()
+    with $Provider<SyncableRepository<CatalogItem>> {
+  CatalogItemRepositoryProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'maintenanceEventRepositoryProvider',
+        name: r'catalogItemRepositoryProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$maintenanceEventRepositoryHash();
+  String debugGetCreateSourceHash() => _$catalogItemRepositoryHash();
 
   @$internal
   @override
-  $ProviderElement<SyncableRepository<MaintenanceEvent>> $createElement(
+  $ProviderElement<SyncableRepository<CatalogItem>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  SyncableRepository<MaintenanceEvent> create(Ref ref) {
-    return maintenanceEventRepository(ref);
+  SyncableRepository<CatalogItem> create(Ref ref) {
+    return catalogItemRepository(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(SyncableRepository<MaintenanceEvent> value) {
+  Override overrideWithValue(SyncableRepository<CatalogItem> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride:
-          $SyncValueProvider<SyncableRepository<MaintenanceEvent>>(value),
-    );
-  }
-}
-
-String _$maintenanceEventRepositoryHash() =>
-    r'ce02353108d8084242cbe0e57697b09a2012fb6f';
-
-@ProviderFor(maintenanceTaskRepository)
-final maintenanceTaskRepositoryProvider = MaintenanceTaskRepositoryProvider._();
-
-final class MaintenanceTaskRepositoryProvider
-    extends
-        $FunctionalProvider<
-          SyncableRepository<MaintenanceTask>,
-          SyncableRepository<MaintenanceTask>,
-          SyncableRepository<MaintenanceTask>
-        >
-    with $Provider<SyncableRepository<MaintenanceTask>> {
-  MaintenanceTaskRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'maintenanceTaskRepositoryProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$maintenanceTaskRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<SyncableRepository<MaintenanceTask>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  SyncableRepository<MaintenanceTask> create(Ref ref) {
-    return maintenanceTaskRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(SyncableRepository<MaintenanceTask> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<SyncableRepository<MaintenanceTask>>(
+      providerOverride: $SyncValueProvider<SyncableRepository<CatalogItem>>(
         value,
       ),
     );
   }
 }
 
-String _$maintenanceTaskRepositoryHash() =>
-    r'6f28d162c7c9bd58f4cd86d8653e27bb88cf6b0a';
+String _$catalogItemRepositoryHash() =>
+    r'dc32732cb3240fe6ef3c6976babde845f2d78c01';
+
+@ProviderFor(operationRepository)
+final operationRepositoryProvider = OperationRepositoryProvider._();
+
+final class OperationRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<Operation>,
+          SyncableRepository<Operation>,
+          SyncableRepository<Operation>
+        >
+    with $Provider<SyncableRepository<Operation>> {
+  OperationRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'operationRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$operationRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<Operation>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<Operation> create(Ref ref) {
+    return operationRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<Operation> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<Operation>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$operationRepositoryHash() =>
+    r'6806493404076a2504d066312a2afb8fc2cf857b';
+
+@ProviderFor(operationLineRepository)
+final operationLineRepositoryProvider = OperationLineRepositoryProvider._();
+
+final class OperationLineRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<OperationLine>,
+          SyncableRepository<OperationLine>,
+          SyncableRepository<OperationLine>
+        >
+    with $Provider<SyncableRepository<OperationLine>> {
+  OperationLineRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'operationLineRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$operationLineRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<OperationLine>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<OperationLine> create(Ref ref) {
+    return operationLineRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<OperationLine> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<OperationLine>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$operationLineRepositoryHash() =>
+    r'a8c2e3473547ced3714b1e7f3551727a80d1efb7';
+
+@ProviderFor(planRepository)
+final planRepositoryProvider = PlanRepositoryProvider._();
+
+final class PlanRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<Plan>,
+          SyncableRepository<Plan>,
+          SyncableRepository<Plan>
+        >
+    with $Provider<SyncableRepository<Plan>> {
+  PlanRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'planRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$planRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<Plan>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<Plan> create(Ref ref) {
+    return planRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<Plan> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<Plan>>(value),
+    );
+  }
+}
+
+String _$planRepositoryHash() => r'9ce2487d526d687b499c0c1c23ded737b61a3d67';
 
 @ProviderFor(tirePressureRepository)
 final tirePressureRepositoryProvider = TirePressureRepositoryProvider._();

@@ -1,5 +1,5 @@
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 
 /// Calculs dérivés d'un véhicule — faits **localement** (offline-first).
@@ -7,12 +7,12 @@ abstract final class VehicleStatsService {
   /// Km courant = MAX(odometer) sur toutes les saisies.
   static int? currentOdometer({
     List<FuelEntry> fuel = const [],
-    List<MaintenanceEvent> maintenance = const [],
+    List<Operation> operations = const [],
     List<TirePressureEntry> tires = const [],
   }) {
     final odos = <int>[
       ...fuel.map((e) => e.odometer),
-      ...maintenance.map((e) => e.odometer),
+      ...operations.map((e) => e.odometer),
       ...tires.map((e) => e.odometer),
     ];
     if (odos.isEmpty) return null;

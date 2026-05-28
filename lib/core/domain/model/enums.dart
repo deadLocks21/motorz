@@ -37,31 +37,6 @@ enum FuelType {
   };
 }
 
-/// Type de tâche du backlog. Le contrôle technique est une échéance datée.
-enum TaskKind {
-  oneShot,
-  periodic,
-  controleTechnique;
-
-  String get wire => switch (this) {
-    TaskKind.oneShot => 'one_shot',
-    TaskKind.periodic => 'periodic',
-    TaskKind.controleTechnique => 'controle_technique',
-  };
-
-  static TaskKind fromWire(String w) => switch (w) {
-    'one_shot' => TaskKind.oneShot,
-    'controle_technique' => TaskKind.controleTechnique,
-    _ => TaskKind.periodic,
-  };
-
-  String get label => switch (this) {
-    TaskKind.oneShot => 'Tâche ponctuelle',
-    TaskKind.periodic => 'Entretien périodique',
-    TaskKind.controleTechnique => 'Contrôle technique',
-  };
-}
-
 enum TaskPriority {
   basse,
   normale,

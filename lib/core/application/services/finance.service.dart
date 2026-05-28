@@ -1,6 +1,8 @@
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 
@@ -47,7 +49,8 @@ abstract final class FinanceService {
   static TcoSummary compute({
     required List<Ownership> ownerships,
     required List<FuelEntry> fuel,
-    required List<MaintenanceEvent> maintenance,
+    required List<Operation> operations,
+    required List<OperationLine> lines,
     required List<CostEntry> costs,
     List<MaintenanceQuote> quotes = const [],
     int? currentOdometer,
@@ -62,9 +65,17 @@ abstract final class FinanceService {
     // Seules les dépenses datées ≥ ma date d'acquisition comptent (§5.2).
     bool since(DateTime d) => acquiredDate == null || !d.isBefore(acquiredDate);
 
+    // Coût réel d'une opération = somme de ses lignes.
+    final linesByOp = <String, List<OperationLine>>{};
+    for (final l in lines) {
+      (linesByOp[l.operationId.value] ??= []).add(l);
+    }
+    double opCost(Operation o) =>
+        MaintenanceDerivationService.operationCost(linesByOp[o.id.value] ?? const []) ?? 0;
+
     final fuelCost = fuel.where((e) => since(e.date)).fold<double>(0, (s, e) => s + (e.totalCost ?? 0));
-    final maintList = maintenance.where((e) => since(e.date)).toList();
-    final maintenanceCost = maintList.fold<double>(0, (s, e) => s + (e.effectiveCost ?? 0));
+    final opsList = operations.where((e) => since(e.date)).toList();
+    final maintenanceCost = opsList.fold<double>(0, (s, e) => s + opCost(e));
     final otherCost = costs.where((e) => since(e.date)).fold<double>(0, (s, e) => s + (e.amount ?? 0));
     final tco = (purchasePrice ?? 0) + fuelCost + maintenanceCost + otherCost;
 
@@ -80,16 +91,16 @@ abstract final class FinanceService {
     }
 
     // Estimatif « tout en garage » : devis retenu (si compté) sinon coût réel.
-    final selectedByEvent = <String, MaintenanceQuote>{};
+    final selectedByOp = <String, MaintenanceQuote>{};
     for (final q in quotes) {
-      if (q.isSelected && q.amount != null) selectedByEvent[q.maintenanceEventId.value] = q;
+      if (q.isSelected && q.amount != null) selectedByOp[q.operationId.value] = q;
     }
     double garageEstimate = 0;
     double realTotal = 0;
-    for (final e in maintList) {
-      final real = e.effectiveCost ?? 0;
+    for (final e in opsList) {
+      final real = opCost(e);
       realTotal += real;
-      final q = selectedByEvent[e.id.value];
+      final q = selectedByOp[e.id.value];
       garageEstimate += (q != null && e.countQuoteInEstimate) ? q.amount! : real;
     }
 

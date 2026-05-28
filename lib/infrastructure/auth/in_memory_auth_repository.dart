@@ -15,6 +15,12 @@ class InMemoryAuthRepository implements AuthRepository {
   /// Numéros autorisés en mode local-only, en E.164. Ici `06 12 34 56 78`.
   static const _allowedPhones = {'+33612345678'};
 
+  /// Identité **déterministe** du compte démo, stable d'un login à l'autre (un
+  /// `UuidValue.generate()` donnerait un propriétaire différent à chaque login,
+  /// faisant basculer les véhicules en « partagés »). Le seed de démo rattache
+  /// ses données à cet `id` — qui correspond donc à « Mes véhicules ».
+  static final _demoUserId = UuidValue.parse('0a5c0000-0000-4000-8000-0000000000ff');
+
   @override
   Future<DateTime> requestOtp(PhoneNumber phone) async {
     if (!_allowedPhones.contains(phone.e164)) {
@@ -36,7 +42,7 @@ class InMemoryAuthRepository implements AuthRepository {
     return Session(
       jwt: 'dev.jwt.token',
       user: User(
-        id: UuidValue.generate(),
+        id: _demoUserId,
         firstName: 'Dev',
         lastName: 'User',
         phoneNumber: phone.e164,

@@ -1,12 +1,15 @@
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/finance.service.dart';
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
@@ -18,8 +21,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'vehicle_data_providers.g.dart';
 
-/// Tâche du backlog enrichie de son échéance calculée.
-typedef DueTask = ({MaintenanceTask task, DueInfo due});
+/// Plan (échéance) enrichi de son échéance calculée et de sa dernière réalisation.
+typedef DuePlan = ({Plan plan, DueInfo due, LastDone? lastDone});
 
 /// Tous les véhicules accessibles (mes véhicules + partagés), depuis le local.
 @riverpod
@@ -44,18 +47,47 @@ Future<List<FuelEntry>> fuelEntries(Ref ref, String vehicleId) async {
   return list;
 }
 
+/// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 @riverpod
-Future<List<MaintenanceEvent>> maintenanceEvents(Ref ref, String vehicleId) async {
+Future<List<Operation>> operations(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
-  final list = await ref.watch(maintenanceEventRepositoryProvider).listForVehicle(vehicleId);
+  final list = await ref.watch(operationRepositoryProvider).listForVehicle(vehicleId);
   list.sort((a, b) => b.date.compareTo(a.date));
   return list;
 }
 
+/// Lignes d'une opération (un poste fait par ligne).
 @riverpod
-Future<List<MaintenanceTask>> maintenanceTasks(Ref ref, String vehicleId) async {
+Future<List<OperationLine>> operationLines(Ref ref, String operationId) async {
   ref.watch(storeChangesProvider);
-  return ref.watch(maintenanceTaskRepositoryProvider).listForVehicle(vehicleId);
+  final all = await ref.watch(operationLineRepositoryProvider).listAll();
+  return all.where((l) => l.operationId.value == operationId).toList();
+}
+
+/// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+@riverpod
+Future<List<OperationLine>> linesForVehicle(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  final ops = await ref.watch(operationsProvider(vehicleId).future);
+  final opIds = ops.map((o) => o.id.value).toSet();
+  final all = await ref.watch(operationLineRepositoryProvider).listAll();
+  return all.where((l) => opIds.contains(l.operationId.value)).toList();
+}
+
+/// Plans (échéances à prévoir) du véhicule.
+@riverpod
+Future<List<Plan>> plans(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  return ref.watch(planRepositoryProvider).listForVehicle(vehicleId);
+}
+
+/// Catalogue de postes de l'utilisateur (trié par nom).
+@riverpod
+Future<List<CatalogItem>> catalogItems(Ref ref) async {
+  ref.watch(storeChangesProvider);
+  final list = await ref.watch(catalogItemRepositoryProvider).listAll();
+  list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  return list;
 }
 
 @riverpod
@@ -95,17 +127,17 @@ Future<List<CostEntry>> costEntries(Ref ref, String vehicleId) async {
 @riverpod
 Future<List<MaintenanceQuote>> quotesForVehicle(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
-  final events = await ref.watch(maintenanceEventsProvider(vehicleId).future);
-  final eventIds = events.map((e) => e.id.value).toSet();
+  final ops = await ref.watch(operationsProvider(vehicleId).future);
+  final opIds = ops.map((e) => e.id.value).toSet();
   final all = await ref.watch(maintenanceQuoteRepositoryProvider).listAll();
-  return all.where((q) => eventIds.contains(q.maintenanceEventId.value)).toList();
+  return all.where((q) => opIds.contains(q.operationId.value)).toList();
 }
 
 @riverpod
-Future<List<MaintenanceQuote>> quotesForEvent(Ref ref, String eventId) async {
+Future<List<MaintenanceQuote>> quotesForOperation(Ref ref, String operationId) async {
   ref.watch(storeChangesProvider);
   final all = await ref.watch(maintenanceQuoteRepositoryProvider).listAll();
-  return all.where((q) => q.maintenanceEventId.value == eventId).toList();
+  return all.where((q) => q.operationId.value == operationId).toList();
 }
 
 /// Documents (photos/PDF) rattachés à une cible (véhicule, plein, opération…).
@@ -122,14 +154,16 @@ Future<List<MediaItem>> mediaForOwner(Ref ref, String ownerId) async {
 Future<TcoSummary> financeSummary(Ref ref, String vehicleId) async {
   final ownerships = await ref.watch(ownershipsProvider(vehicleId).future);
   final fuel = await ref.watch(fuelEntriesProvider(vehicleId).future);
-  final maintenance = await ref.watch(maintenanceEventsProvider(vehicleId).future);
+  final ops = await ref.watch(operationsProvider(vehicleId).future);
+  final lines = await ref.watch(linesForVehicleProvider(vehicleId).future);
   final costs = await ref.watch(costEntriesProvider(vehicleId).future);
   final quotes = await ref.watch(quotesForVehicleProvider(vehicleId).future);
   final odo = await ref.watch(currentOdometerProvider(vehicleId).future);
   return FinanceService.compute(
     ownerships: ownerships,
     fuel: fuel,
-    maintenance: maintenance,
+    operations: ops,
+    lines: lines,
     costs: costs,
     quotes: quotes,
     currentOdometer: odo,
@@ -140,9 +174,9 @@ Future<TcoSummary> financeSummary(Ref ref, String vehicleId) async {
 @riverpod
 Future<int?> currentOdometer(Ref ref, String vehicleId) async {
   final fuel = await ref.watch(fuelEntriesProvider(vehicleId).future);
-  final events = await ref.watch(maintenanceEventsProvider(vehicleId).future);
+  final ops = await ref.watch(operationsProvider(vehicleId).future);
   final tires = await ref.watch(tirePressuresProvider(vehicleId).future);
-  return VehicleStatsService.currentOdometer(fuel: fuel, maintenance: events, tires: tires);
+  return VehicleStatsService.currentOdometer(fuel: fuel, operations: ops, tires: tires);
 }
 
 @riverpod
@@ -152,13 +186,22 @@ Future<double?> averageConsumption(Ref ref, String vehicleId) async {
 }
 
 /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
+/// Projection pure : plans + historique (dernière réalisation dérivée).
 @riverpod
-Future<List<DueTask>> dueTasks(Ref ref, String vehicleId) async {
-  final tasks = await ref.watch(maintenanceTasksProvider(vehicleId).future);
+Future<List<DuePlan>> duePlans(Ref ref, String vehicleId) async {
+  final plans = await ref.watch(plansProvider(vehicleId).future);
+  final ops = await ref.watch(operationsProvider(vehicleId).future);
+  final lines = await ref.watch(linesForVehicleProvider(vehicleId).future);
   final odo = await ref.watch(currentOdometerProvider(vehicleId).future);
-  final result = tasks
-      .map((t) => (task: t, due: DueStatusService.compute(t, currentOdometer: odo)))
-      .toList();
+  final lastDones = MaintenanceDerivationService.lastDoneAll(plans, ops, lines);
+  final result = [
+    for (final pl in lastDones)
+      (
+        plan: pl.plan,
+        lastDone: pl.lastDone,
+        due: DueStatusService.compute(pl.plan, lastDone: pl.lastDone, currentOdometer: odo),
+      ),
+  ];
   int rank(DueStatus s) => switch (s) {
     DueStatus.overdue => 0,
     DueStatus.dueSoon => 1,

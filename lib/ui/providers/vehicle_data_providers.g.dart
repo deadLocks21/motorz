@@ -197,55 +197,58 @@ final class FuelEntriesFamily extends $Family
   String toString() => r'fuelEntriesProvider';
 }
 
-@ProviderFor(maintenanceEvents)
-final maintenanceEventsProvider = MaintenanceEventsFamily._();
+/// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
 
-final class MaintenanceEventsProvider
+@ProviderFor(operations)
+final operationsProvider = OperationsFamily._();
+
+/// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
+
+final class OperationsProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<MaintenanceEvent>>,
-          List<MaintenanceEvent>,
-          FutureOr<List<MaintenanceEvent>>
+          AsyncValue<List<Operation>>,
+          List<Operation>,
+          FutureOr<List<Operation>>
         >
-    with
-        $FutureModifier<List<MaintenanceEvent>>,
-        $FutureProvider<List<MaintenanceEvent>> {
-  MaintenanceEventsProvider._({
-    required MaintenanceEventsFamily super.from,
+    with $FutureModifier<List<Operation>>, $FutureProvider<List<Operation>> {
+  /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
+  OperationsProvider._({
+    required OperationsFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'maintenanceEventsProvider',
+         name: r'operationsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$maintenanceEventsHash();
+  String debugGetCreateSourceHash() => _$operationsHash();
 
   @override
   String toString() {
-    return r'maintenanceEventsProvider'
+    return r'operationsProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $FutureProviderElement<List<MaintenanceEvent>> $createElement(
+  $FutureProviderElement<List<Operation>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<MaintenanceEvent>> create(Ref ref) {
+  FutureOr<List<Operation>> create(Ref ref) {
     final argument = this.argument as String;
-    return maintenanceEvents(ref, argument);
+    return operations(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is MaintenanceEventsProvider && other.argument == argument;
+    return other is OperationsProvider && other.argument == argument;
   }
 
   @override
@@ -254,75 +257,84 @@ final class MaintenanceEventsProvider
   }
 }
 
-String _$maintenanceEventsHash() => r'9755fa16a95b1fbc2445be455d5b1ea6ede18960';
+String _$operationsHash() => r'86a4c69096d90d14f3cd45418d6854f45d188cdd';
 
-final class MaintenanceEventsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<MaintenanceEvent>>, String> {
-  MaintenanceEventsFamily._()
+/// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
+
+final class OperationsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<Operation>>, String> {
+  OperationsFamily._()
     : super(
         retry: null,
-        name: r'maintenanceEventsProvider',
+        name: r'operationsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  MaintenanceEventsProvider call(String vehicleId) =>
-      MaintenanceEventsProvider._(argument: vehicleId, from: this);
+  /// Opérations d'entretien réalisées du véhicule (plus récentes d'abord).
+
+  OperationsProvider call(String vehicleId) =>
+      OperationsProvider._(argument: vehicleId, from: this);
 
   @override
-  String toString() => r'maintenanceEventsProvider';
+  String toString() => r'operationsProvider';
 }
 
-@ProviderFor(maintenanceTasks)
-final maintenanceTasksProvider = MaintenanceTasksFamily._();
+/// Lignes d'une opération (un poste fait par ligne).
 
-final class MaintenanceTasksProvider
+@ProviderFor(operationLines)
+final operationLinesProvider = OperationLinesFamily._();
+
+/// Lignes d'une opération (un poste fait par ligne).
+
+final class OperationLinesProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<MaintenanceTask>>,
-          List<MaintenanceTask>,
-          FutureOr<List<MaintenanceTask>>
+          AsyncValue<List<OperationLine>>,
+          List<OperationLine>,
+          FutureOr<List<OperationLine>>
         >
     with
-        $FutureModifier<List<MaintenanceTask>>,
-        $FutureProvider<List<MaintenanceTask>> {
-  MaintenanceTasksProvider._({
-    required MaintenanceTasksFamily super.from,
+        $FutureModifier<List<OperationLine>>,
+        $FutureProvider<List<OperationLine>> {
+  /// Lignes d'une opération (un poste fait par ligne).
+  OperationLinesProvider._({
+    required OperationLinesFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'maintenanceTasksProvider',
+         name: r'operationLinesProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$maintenanceTasksHash();
+  String debugGetCreateSourceHash() => _$operationLinesHash();
 
   @override
   String toString() {
-    return r'maintenanceTasksProvider'
+    return r'operationLinesProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $FutureProviderElement<List<MaintenanceTask>> $createElement(
+  $FutureProviderElement<List<OperationLine>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<MaintenanceTask>> create(Ref ref) {
+  FutureOr<List<OperationLine>> create(Ref ref) {
     final argument = this.argument as String;
-    return maintenanceTasks(ref, argument);
+    return operationLines(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is MaintenanceTasksProvider && other.argument == argument;
+    return other is OperationLinesProvider && other.argument == argument;
   }
 
   @override
@@ -331,25 +343,244 @@ final class MaintenanceTasksProvider
   }
 }
 
-String _$maintenanceTasksHash() => r'6af2d2273951ec184a3eeeebca319ebf4673fc12';
+String _$operationLinesHash() => r'cc3a61d93ad10659726e3a0dc480085554dc4646';
 
-final class MaintenanceTasksFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<MaintenanceTask>>, String> {
-  MaintenanceTasksFamily._()
+/// Lignes d'une opération (un poste fait par ligne).
+
+final class OperationLinesFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<OperationLine>>, String> {
+  OperationLinesFamily._()
     : super(
         retry: null,
-        name: r'maintenanceTasksProvider',
+        name: r'operationLinesProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  MaintenanceTasksProvider call(String vehicleId) =>
-      MaintenanceTasksProvider._(argument: vehicleId, from: this);
+  /// Lignes d'une opération (un poste fait par ligne).
+
+  OperationLinesProvider call(String operationId) =>
+      OperationLinesProvider._(argument: operationId, from: this);
 
   @override
-  String toString() => r'maintenanceTasksProvider';
+  String toString() => r'operationLinesProvider';
 }
+
+/// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+
+@ProviderFor(linesForVehicle)
+final linesForVehicleProvider = LinesForVehicleFamily._();
+
+/// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+
+final class LinesForVehicleProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<OperationLine>>,
+          List<OperationLine>,
+          FutureOr<List<OperationLine>>
+        >
+    with
+        $FutureModifier<List<OperationLine>>,
+        $FutureProvider<List<OperationLine>> {
+  /// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+  LinesForVehicleProvider._({
+    required LinesForVehicleFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'linesForVehicleProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$linesForVehicleHash();
+
+  @override
+  String toString() {
+    return r'linesForVehicleProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<OperationLine>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<OperationLine>> create(Ref ref) {
+    final argument = this.argument as String;
+    return linesForVehicle(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is LinesForVehicleProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$linesForVehicleHash() => r'b6eafbb504289f2f174679ea6eb07d29c64b0d6e';
+
+/// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+
+final class LinesForVehicleFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<OperationLine>>, String> {
+  LinesForVehicleFamily._()
+    : super(
+        retry: null,
+        name: r'linesForVehicleProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Toutes les lignes d'opérations du véhicule (pour la dérivation des échéances).
+
+  LinesForVehicleProvider call(String vehicleId) =>
+      LinesForVehicleProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'linesForVehicleProvider';
+}
+
+/// Plans (échéances à prévoir) du véhicule.
+
+@ProviderFor(plans)
+final plansProvider = PlansFamily._();
+
+/// Plans (échéances à prévoir) du véhicule.
+
+final class PlansProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Plan>>,
+          List<Plan>,
+          FutureOr<List<Plan>>
+        >
+    with $FutureModifier<List<Plan>>, $FutureProvider<List<Plan>> {
+  /// Plans (échéances à prévoir) du véhicule.
+  PlansProvider._({
+    required PlansFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'plansProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$plansHash();
+
+  @override
+  String toString() {
+    return r'plansProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<Plan>> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<Plan>> create(Ref ref) {
+    final argument = this.argument as String;
+    return plans(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PlansProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$plansHash() => r'df2a9f52683de121f6427b25284c4ac094760bc0';
+
+/// Plans (échéances à prévoir) du véhicule.
+
+final class PlansFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<Plan>>, String> {
+  PlansFamily._()
+    : super(
+        retry: null,
+        name: r'plansProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Plans (échéances à prévoir) du véhicule.
+
+  PlansProvider call(String vehicleId) =>
+      PlansProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'plansProvider';
+}
+
+/// Catalogue de postes de l'utilisateur (trié par nom).
+
+@ProviderFor(catalogItems)
+final catalogItemsProvider = CatalogItemsProvider._();
+
+/// Catalogue de postes de l'utilisateur (trié par nom).
+
+final class CatalogItemsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<CatalogItem>>,
+          List<CatalogItem>,
+          FutureOr<List<CatalogItem>>
+        >
+    with
+        $FutureModifier<List<CatalogItem>>,
+        $FutureProvider<List<CatalogItem>> {
+  /// Catalogue de postes de l'utilisateur (trié par nom).
+  CatalogItemsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'catalogItemsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$catalogItemsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<CatalogItem>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<CatalogItem>> create(Ref ref) {
+    return catalogItems(ref);
+  }
+}
+
+String _$catalogItemsHash() => r'7d073ad3bc7771faaebc25b1321be8673f3493ec';
 
 @ProviderFor(tirePressures)
 final tirePressuresProvider = TirePressuresFamily._();
@@ -717,7 +948,7 @@ final class QuotesForVehicleProvider
   }
 }
 
-String _$quotesForVehicleHash() => r'287d60fb674a088dc134fe7ef951e09fd6457e1d';
+String _$quotesForVehicleHash() => r'4db57c794380da03108947fce4e7bcf3b963e069';
 
 /// Devis du véhicule (filtrés via les opérations d'entretien du véhicule).
 
@@ -741,10 +972,10 @@ final class QuotesForVehicleFamily extends $Family
   String toString() => r'quotesForVehicleProvider';
 }
 
-@ProviderFor(quotesForEvent)
-final quotesForEventProvider = QuotesForEventFamily._();
+@ProviderFor(quotesForOperation)
+final quotesForOperationProvider = QuotesForOperationFamily._();
 
-final class QuotesForEventProvider
+final class QuotesForOperationProvider
     extends
         $FunctionalProvider<
           AsyncValue<List<MaintenanceQuote>>,
@@ -754,23 +985,23 @@ final class QuotesForEventProvider
     with
         $FutureModifier<List<MaintenanceQuote>>,
         $FutureProvider<List<MaintenanceQuote>> {
-  QuotesForEventProvider._({
-    required QuotesForEventFamily super.from,
+  QuotesForOperationProvider._({
+    required QuotesForOperationFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'quotesForEventProvider',
+         name: r'quotesForOperationProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$quotesForEventHash();
+  String debugGetCreateSourceHash() => _$quotesForOperationHash();
 
   @override
   String toString() {
-    return r'quotesForEventProvider'
+    return r'quotesForOperationProvider'
         ''
         '($argument)';
   }
@@ -784,12 +1015,12 @@ final class QuotesForEventProvider
   @override
   FutureOr<List<MaintenanceQuote>> create(Ref ref) {
     final argument = this.argument as String;
-    return quotesForEvent(ref, argument);
+    return quotesForOperation(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is QuotesForEventProvider && other.argument == argument;
+    return other is QuotesForOperationProvider && other.argument == argument;
   }
 
   @override
@@ -798,24 +1029,25 @@ final class QuotesForEventProvider
   }
 }
 
-String _$quotesForEventHash() => r'1d867b48e425bfb93dd2196859b09b3c42da121a';
+String _$quotesForOperationHash() =>
+    r'df34b6d19524d1d5777f1b70526a3654b5e9f5c2';
 
-final class QuotesForEventFamily extends $Family
+final class QuotesForOperationFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<MaintenanceQuote>>, String> {
-  QuotesForEventFamily._()
+  QuotesForOperationFamily._()
     : super(
         retry: null,
-        name: r'quotesForEventProvider',
+        name: r'quotesForOperationProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  QuotesForEventProvider call(String eventId) =>
-      QuotesForEventProvider._(argument: eventId, from: this);
+  QuotesForOperationProvider call(String operationId) =>
+      QuotesForOperationProvider._(argument: operationId, from: this);
 
   @override
-  String toString() => r'quotesForEventProvider';
+  String toString() => r'quotesForOperationProvider';
 }
 
 /// Documents (photos/PDF) rattachés à une cible (véhicule, plein, opération…).
@@ -961,7 +1193,7 @@ final class FinanceSummaryProvider
   }
 }
 
-String _$financeSummaryHash() => r'585fdba961d1755e0ef27c0b1facec0cbca164b8';
+String _$financeSummaryHash() => r'694536ddab875c4dce3217bb12602182f7d84099';
 
 /// Synthèse TCO (mon achat + carburant + entretien + autres frais depuis mon achat).
 
@@ -1039,7 +1271,7 @@ final class CurrentOdometerProvider
   }
 }
 
-String _$currentOdometerHash() => r'3de72d935e6937e152f3a187a365bbd1f321662a';
+String _$currentOdometerHash() => r'85401e108b19facecb4da8c222d519728c31eeac';
 
 /// Km courant dérivé localement (MAX odometer toutes saisies).
 
@@ -1134,57 +1366,60 @@ final class AverageConsumptionFamily extends $Family
 }
 
 /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
+/// Projection pure : plans + historique (dernière réalisation dérivée).
 
-@ProviderFor(dueTasks)
-final dueTasksProvider = DueTasksFamily._();
+@ProviderFor(duePlans)
+final duePlansProvider = DuePlansFamily._();
 
 /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
+/// Projection pure : plans + historique (dernière réalisation dérivée).
 
-final class DueTasksProvider
+final class DuePlansProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<DueTask>>,
-          List<DueTask>,
-          FutureOr<List<DueTask>>
+          AsyncValue<List<DuePlan>>,
+          List<DuePlan>,
+          FutureOr<List<DuePlan>>
         >
-    with $FutureModifier<List<DueTask>>, $FutureProvider<List<DueTask>> {
+    with $FutureModifier<List<DuePlan>>, $FutureProvider<List<DuePlan>> {
   /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
-  DueTasksProvider._({
-    required DueTasksFamily super.from,
+  /// Projection pure : plans + historique (dernière réalisation dérivée).
+  DuePlansProvider._({
+    required DuePlansFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'dueTasksProvider',
+         name: r'duePlansProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$dueTasksHash();
+  String debugGetCreateSourceHash() => _$duePlansHash();
 
   @override
   String toString() {
-    return r'dueTasksProvider'
+    return r'duePlansProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $FutureProviderElement<List<DueTask>> $createElement(
+  $FutureProviderElement<List<DuePlan>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<DueTask>> create(Ref ref) {
+  FutureOr<List<DuePlan>> create(Ref ref) {
     final argument = this.argument as String;
-    return dueTasks(ref, argument);
+    return duePlans(ref, argument);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is DueTasksProvider && other.argument == argument;
+    return other is DuePlansProvider && other.argument == argument;
   }
 
   @override
@@ -1193,26 +1428,28 @@ final class DueTasksProvider
   }
 }
 
-String _$dueTasksHash() => r'34166c6cab9b33d495611c573e79672d5536402c';
+String _$duePlansHash() => r'32e4a226d017680eb664e426ab76e5a4ae247f4a';
 
 /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
+/// Projection pure : plans + historique (dernière réalisation dérivée).
 
-final class DueTasksFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<DueTask>>, String> {
-  DueTasksFamily._()
+final class DuePlansFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<DuePlan>>, String> {
+  DuePlansFamily._()
     : super(
         retry: null,
-        name: r'dueTasksProvider',
+        name: r'duePlansProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
   /// Échéances triées par urgence (en retard, puis bientôt, puis à venir).
+  /// Projection pure : plans + historique (dernière réalisation dérivée).
 
-  DueTasksProvider call(String vehicleId) =>
-      DueTasksProvider._(argument: vehicleId, from: this);
+  DuePlansProvider call(String vehicleId) =>
+      DuePlansProvider._(argument: vehicleId, from: this);
 
   @override
-  String toString() => r'dueTasksProvider';
+  String toString() => r'duePlansProvider';
 }

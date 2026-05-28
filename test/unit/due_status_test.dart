@@ -1,55 +1,87 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
+import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
-import 'package:motorz/core/domain/model/maintenance_task.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 
 void main() {
   final vehicleId = UuidValue.generate();
+  final catalogId = UuidValue.generate();
   final now = DateTime(2026, 5, 26);
 
-  MaintenanceTask periodic({int? lastDoneOdometer, int? intervalKm}) => MaintenanceTask(
+  Plan recurring({int? intervalKm, int? intervalMonths}) => Plan(
         id: UuidValue.generate(),
         vehicleId: vehicleId,
-        title: 'Vidange',
-        kind: TaskKind.periodic,
+        catalogItemId: catalogId,
         intervalKm: intervalKm,
-        lastDoneOdometer: lastDoneOdometer,
+        intervalMonths: intervalMonths,
         updatedAt: now,
       );
 
-  test('périodique : à venir loin de l\'échéance', () {
-    final task = periodic(lastDoneOdometer: 100000, intervalKm: 15000);
-    final due = DueStatusService.compute(task, currentOdometer: 102000, now: now);
+  test('récurrent : à venir loin de l\'échéance', () {
+    final plan = recurring(intervalKm: 15000);
+    final due = DueStatusService.compute(plan,
+        lastDone: LastDone(odometer: 100000, date: now), currentOdometer: 102000, now: now);
     expect(due.status, DueStatus.upcoming);
     expect(due.remainingKm, 13000);
   });
 
-  test('périodique : bientôt dû sous le seuil de 1000 km', () {
-    final task = periodic(lastDoneOdometer: 100000, intervalKm: 15000);
-    final due = DueStatusService.compute(task, currentOdometer: 114500, now: now);
+  test('récurrent : bientôt dû sous le seuil de 1000 km', () {
+    final plan = recurring(intervalKm: 15000);
+    final due = DueStatusService.compute(plan,
+        lastDone: LastDone(odometer: 100000, date: now), currentOdometer: 114500, now: now);
     expect(due.status, DueStatus.dueSoon);
     expect(due.remainingKm, 500);
   });
 
-  test('périodique : en retard quand le km cible est dépassé', () {
-    final task = periodic(lastDoneOdometer: 100000, intervalKm: 15000);
-    final due = DueStatusService.compute(task, currentOdometer: 116000, now: now);
+  test('récurrent : en retard quand le km cible est dépassé', () {
+    final plan = recurring(intervalKm: 15000);
+    final due = DueStatusService.compute(plan,
+        lastDone: LastDone(odometer: 100000, date: now), currentOdometer: 116000, now: now);
     expect(due.status, DueStatus.overdue);
     expect(due.remainingKm, -1000);
   });
 
-  test('contrôle technique : échéance datée en retard', () {
-    final task = MaintenanceTask(
+  test('échéance datée (amorce) en retard, sans dernière réalisation', () {
+    final plan = Plan(
       id: UuidValue.generate(),
       vehicleId: vehicleId,
-      title: 'Contrôle technique',
-      kind: TaskKind.controleTechnique,
+      catalogItemId: catalogId,
+      intervalMonths: 24,
       dueDate: '2026-05-01',
       updatedAt: now,
     );
-    final due = DueStatusService.compute(task, now: now);
+    final due = DueStatusService.compute(plan, now: now); // pas de lastDone → amorce
     expect(due.status, DueStatus.overdue);
     expect(due.remainingDays, isNegative);
+  });
+
+  test('l\'intervalle prend le relais de l\'amorce une fois une réalisation connue', () {
+    final plan = Plan(
+      id: UuidValue.generate(),
+      vehicleId: vehicleId,
+      catalogItemId: catalogId,
+      intervalMonths: 24,
+      dueDate: '2026-05-01', // amorce passée
+      updatedAt: now,
+    );
+    final due = DueStatusService.compute(plan,
+        lastDone: LastDone(odometer: 50000, date: DateTime(2026, 4, 1)), now: now);
+    expect(due.dueDate, DateTime(2028, 4, 1));
+    expect(due.status, DueStatus.upcoming);
+  });
+
+  test('ponctuel sans poste : utilise la cible km', () {
+    final plan = Plan(
+      id: UuidValue.generate(),
+      vehicleId: vehicleId,
+      title: 'Distribution',
+      dueOdometer: 120000,
+      updatedAt: now,
+    );
+    final due = DueStatusService.compute(plan, currentOdometer: 119500, now: now);
+    expect(due.remainingKm, 500);
+    expect(due.status, DueStatus.dueSoon);
   });
 }

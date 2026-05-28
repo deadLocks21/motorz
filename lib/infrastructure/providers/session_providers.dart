@@ -64,9 +64,16 @@ class SessionController extends _$SessionController {
     ref.read(loggerProvider).info('auth.login');
     final sync = ref.read(syncServiceProvider);
     sync.start();
-    // Au login, on repart de la vérité serveur : on vide l'état local (store +
-    // file + curseur) avant de tout rapatrier. No-op en mode local-only.
-    unawaited(sync.resetToRemote());
+    if (isMemoryMode(ref.read(apiBaseUrlProvider))) {
+      // Mode local-only : garnit le garage d'un véhicule d'exemple rattaché au
+      // compte démo connecté (idempotent). Le store ayant été purgé à la
+      // déconnexion précédente, le seed rejoue à chaque nouvelle session de démo.
+      await DemoSeed(ref.read(localRecordStoreProvider), session.user.id).ensureSeeded();
+    } else {
+      // Au login serveur, on repart de la vérité serveur : on vide l'état local
+      // (store + file + curseur) avant de tout rapatrier.
+      unawaited(sync.resetToRemote());
+    }
   }
 
   /// Restaure une session persistée au démarrage.
@@ -82,6 +89,9 @@ class SessionController extends _$SessionController {
     // Avant `clear()` pour que `user.id` soit encore attaché à l'événement.
     ref.read(loggerProvider).info('auth.logout');
     await ref.read(sessionRepositoryProvider).clear();
+    // Vie privée : ne rien laisser sur l'appareil après déconnexion — on purge le
+    // store local, la file en attente, la dead-letter et le curseur de synchro.
+    await ref.read(syncServiceProvider).purgeLocal();
     state = const Anonymous();
   }
 }
@@ -97,11 +107,8 @@ Session? currentSession(Ref ref) {
 @Riverpod(keepAlive: true)
 Future<void> bootstrap(Ref ref) async {
   await ref.read(apiBaseUrlProvider.notifier).load();
-  // Mode démo (local-only) : garnit le garage d'un véhicule d'exemple au
-  // premier lancement (idempotent), pour ne pas s'ouvrir sur un écran vide.
-  if (isMemoryMode(ref.read(apiBaseUrlProvider))) {
-    await DemoSeed(ref.read(localRecordStoreProvider)).ensureSeeded();
-  }
+  // En mode démo (local-only), le garage est garni au login (cf. `_authenticate`),
+  // une fois l'identité du compte connue — pas ici.
   await ref.read(sessionControllerProvider.notifier).restore();
   final sync = ref.read(syncServiceProvider);
   sync.start();

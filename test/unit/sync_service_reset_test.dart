@@ -95,4 +95,28 @@ void main() {
     expect(api.lastSince, isNull);
     expect(api.pushed, isEmpty);
   });
+
+  test('purgeLocal efface tout l\'état local, même synchro désactivée (vie privée au logout)', () async {
+    final disabled = SyncService(
+      api: api,
+      store: store,
+      queue: queue,
+      connectivity: const AlwaysOnlineConnectivityService(),
+      cursor: cursor,
+      enabled: false,
+    );
+    await store.put('vehicles', {'id': 'demo-seed', 'updated_at': '2026-01-01T00:00:00Z'});
+    await queue.enqueue('vehicles', 'demo-seed', {'id': 'demo-seed'});
+    await cursor.write('2026-01-01T00:00:00Z');
+
+    await disabled.purgeLocal();
+
+    // Contrairement à resetToRemote (no-op si désactivée), purgeLocal vide tout
+    // sans rien rapatrier (aucun pull/push).
+    expect(await store.query('vehicles'), isEmpty);
+    expect(await queue.readAll(), isEmpty);
+    expect(await cursor.read(), isNull);
+    expect(api.lastSince, isNull);
+    expect(api.pushed, isEmpty);
+  });
 }

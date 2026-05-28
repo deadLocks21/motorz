@@ -2,33 +2,48 @@ import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
-import 'package:motorz/core/domain/model/maintenance_event.dart';
+import 'package:motorz/core/domain/model/maintenance_catalog_item.dart';
+import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/maintenance_plan.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 
 /// Garnit le store local d'un véhicule de démonstration (une Ford Mustang GT,
-/// avec pleins et entretien) — uniquement en **mode `memory`** (local-only),
-/// pour que l'app installée depuis le Play Store ne s'ouvre pas sur un garage
-/// vide.
+/// avec pleins, catalogue, opérations à lignes et échéances) — appelé **au login
+/// en mode `memory`** (local-only), pour que l'app installée depuis le Play Store
+/// ne s'ouvre pas sur un garage vide.
+///
+/// Les données sont rattachées au compte démo connecté ([_ownerId] = l'`id` de la
+/// session, déterministe en local-only), si bien que la Mustang apparaît sous
+/// « Mes véhicules ».
 ///
 /// Écrit **directement dans le store**, jamais dans la file de synchro : ce sont
-/// des données purement locales (le mode démo a la synchro désactivée de toute
-/// façon). Comme la liste des véhicules n'est pas filtrée par propriétaire, le
-/// véhicule s'affiche quel que soit l'`id` (aléatoire) du compte démo connecté.
+/// des données purement locales (le mode démo a la synchro désactivée de toute façon).
 ///
 /// **Idempotent** : ne fait rien si le garage contient déjà un véhicule (même
-/// supprimé). Préserve donc les saisies de l'utilisateur entre deux lancements
-/// — le store sqflite persiste même en mode démo — et ne ressuscite pas un
-/// véhicule de démo qu'il aurait effacé.
+/// supprimé). Préserve donc les saisies de l'utilisateur tant qu'il reste connecté
+/// (la déconnexion purge le store) et ne ressuscite pas un véhicule qu'il a effacé.
 class DemoSeed {
-  const DemoSeed(this._store);
+  const DemoSeed(this._store, this._ownerId);
 
   final LocalRecordStore _store;
 
+  /// Propriétaire des données semées : l'`id` du compte démo connecté.
+  final UuidValue _ownerId;
+
   // IDs fixes (et non générés) pour que le seed soit déterministe et rejouable.
   static const _vehicleId = '0a5c0000-0000-4000-8000-000000000001';
-  static const _ownerId = '0a5c0000-0000-4000-8000-0000000000ff';
+
+  // Postes de catalogue (déterministes → référencés par les plans et les lignes).
+  static const _catVidange = '0a5c0000-0000-4000-8000-0000000ca001';
+  static const _catFiltreAir = '0a5c0000-0000-4000-8000-0000000ca002';
+  static const _catFiltreHab = '0a5c0000-0000-4000-8000-0000000ca003';
+  static const _catFreins = '0a5c0000-0000-4000-8000-0000000ca004';
+  static const _catDistribution = '0a5c0000-0000-4000-8000-0000000ca005';
+  static const _catPneus = '0a5c0000-0000-4000-8000-0000000ca006';
+  static const _catCt = '0a5c0000-0000-4000-8000-0000000ca007';
 
   Future<void> ensureSeeded() async {
     final existing = await _store.query('vehicles', includeDeleted: true);
@@ -39,8 +54,17 @@ class DemoSeed {
     for (final fuel in _fuelEntries(vehicleId)) {
       await _put(fuelEntryCodec, fuel);
     }
-    for (final event in _maintenanceEvents(vehicleId)) {
-      await _put(maintenanceEventCodec, event);
+    for (final c in _catalog()) {
+      await _put(catalogItemCodec, c);
+    }
+    for (final op in _operations(vehicleId)) {
+      await _put(operationCodec, op);
+    }
+    for (final l in _lines()) {
+      await _put(operationLineCodec, l);
+    }
+    for (final p in _plans(vehicleId)) {
+      await _put(planCodec, p);
     }
   }
 
@@ -49,7 +73,7 @@ class DemoSeed {
 
   Vehicle _mustang(UuidValue id) => Vehicle(
         id: id,
-        ownerUserId: UuidValue.parse(_ownerId),
+        ownerUserId: _ownerId,
         type: VehicleType.voiture,
         nickname: 'Mustang GT',
         make: 'Ford',
@@ -103,66 +127,106 @@ class DemoSeed {
     ];
   }
 
-  /// Trois opérations d'entretien, cohérentes en date/km avec les pleins.
-  List<MaintenanceEvent> _maintenanceEvents(UuidValue vehicleId) {
-    MaintenanceEvent m(
-      String suffix,
-      DateTime date,
-      int odometer,
-      String title,
-      String category,
-      String provider,
-      double partsCost,
-      double laborCost,
-      String description,
-    ) =>
-        MaintenanceEvent(
+  static final _seedAt = DateTime.utc(2026, 5, 20, 9);
+
+  /// Catalogue de référence (les défauts de `catalogDefaults`), rattaché au compte.
+  List<CatalogItem> _catalog() {
+    CatalogItem c(String id, String name, {int? km, int? months}) => CatalogItem(
+          id: UuidValue.parse(id),
+          userId: _ownerId,
+          name: name,
+          defaultIntervalKm: km,
+          defaultIntervalMonths: months,
+          updatedAt: _seedAt,
+        );
+
+    return [
+      c(_catVidange, 'Vidange', km: 15000, months: 12),
+      c(_catFiltreAir, 'Filtre à air', km: 30000),
+      c(_catFiltreHab, 'Filtre habitacle', months: 12),
+      c(_catFreins, 'Plaquettes de frein', km: 40000),
+      c(_catDistribution, 'Distribution', km: 100000, months: 120),
+      c(_catPneus, 'Pneumatiques', km: 40000),
+      c(_catCt, 'Contrôle technique', months: 24),
+    ];
+  }
+
+  /// Trois opérations (en-têtes), cohérentes en date/km avec les pleins.
+  List<Operation> _operations(UuidValue vehicleId) {
+    Operation o(String suffix, DateTime date, int odometer, String provider, String note) =>
+        Operation(
           id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e$suffix'),
           vehicleId: vehicleId,
           date: date,
           odometer: odometer,
-          title: title,
-          category: category,
-          description: description,
-          partsCost: partsCost,
-          laborCost: laborCost,
           provider: provider,
+          note: note,
           updatedAt: date,
         );
 
     return [
-      m(
-        '0001',
-        DateTime.utc(2024, 9, 12),
-        4200,
-        'Forfait entretien 1re année (vidange + filtres)',
-        'vidange',
-        'Ford Store Paris 15',
-        160,
-        210,
-        'Huile full synthèse 5W-50, filtre à huile, filtre habitacle, inspection multipoint.',
+      o('0001', DateTime.utc(2024, 9, 12), 4200, 'Ford Store Paris 15',
+          'Huile full synthèse 5W-50, filtre habitacle, inspection multipoint.'),
+      o('0002', DateTime.utc(2025, 6, 20), 8100, 'Speedy',
+          'Plaquettes avant remplacées (usure liée à une conduite sportive).'),
+      o('0003', DateTime.utc(2025, 11, 5), 10400, 'Euromaster',
+          '2× Michelin Pilot Sport 4S 255/40 R19, équilibrage et parallélisme.'),
+    ];
+  }
+
+  /// Lignes des opérations (postes faits) : la plupart rattachées au catalogue,
+  /// une ligne libre pour illustrer le hors-catalogue.
+  List<OperationLine> _lines() {
+    OperationLine line(String suffix, String opSuffix,
+            {String? catalogId, String? label, double? parts, double? labor}) =>
+        OperationLine(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d$suffix'),
+          operationId: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e$opSuffix'),
+          catalogItemId: catalogId == null ? null : UuidValue.parse(catalogId),
+          label: label,
+          partsCost: parts,
+          laborCost: labor,
+          updatedAt: _seedAt,
+        );
+
+    return [
+      // Op1 : vidange + filtre habitacle (370 € au total).
+      line('0001', '0001', catalogId: _catVidange, parts: 120, labor: 150),
+      line('0002', '0001', catalogId: _catFiltreHab, parts: 40, labor: 60),
+      // Op2 : plaquettes (235 €).
+      line('0003', '0002', catalogId: _catFreins, parts: 145, labor: 90),
+      // Op3 : pneus + une ligne libre (570 €).
+      line('0004', '0003', catalogId: _catPneus, parts: 460, labor: 80),
+      line('0005', '0003', label: 'Géométrie / parallélisme', labor: 30),
+    ];
+  }
+
+  /// Échéances : une récurrente (vidange, dont la dernière réalisation se dérive
+  /// d'Op1), une à-venir avec amorce (CT d'occasion), une à-venir pure (distribution).
+  List<Plan> _plans(UuidValue vehicleId) {
+    return [
+      Plan(
+        id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0001'),
+        vehicleId: vehicleId,
+        catalogItemId: UuidValue.parse(_catVidange),
+        intervalKm: 15000,
+        intervalMonths: 12,
+        updatedAt: _seedAt,
       ),
-      m(
-        '0002',
-        DateTime.utc(2025, 6, 20),
-        8100,
-        'Plaquettes de frein avant',
-        'freins',
-        'Speedy',
-        145,
-        90,
-        'Plaquettes avant remplacées (usure liée à une conduite sportive).',
+      Plan(
+        id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0002'),
+        vehicleId: vehicleId,
+        catalogItemId: UuidValue.parse(_catCt),
+        intervalMonths: 24,
+        dueDate: '2026-09-01',
+        updatedAt: _seedAt,
       ),
-      m(
-        '0003',
-        DateTime.utc(2025, 11, 5),
-        10400,
-        'Pneus avant + géométrie',
-        'pneumatiques',
-        'Euromaster',
-        460,
-        110,
-        '2× Michelin Pilot Sport 4S 255/40 R19, équilibrage et parallélisme.',
+      Plan(
+        id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000b0003'),
+        vehicleId: vehicleId,
+        title: 'Distribution',
+        dueOdometer: 120000,
+        updatedAt: _seedAt,
       ),
     ];
   }

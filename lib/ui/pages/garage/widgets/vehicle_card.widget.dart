@@ -18,7 +18,7 @@ class VehicleCard extends ConsumerWidget {
     final colors = context.appColors;
     final id = vehicle.id.value;
     final odo = ref.watch(currentOdometerProvider(id)).value;
-    final due = ref.watch(dueTasksProvider(id)).value ?? const [];
+    final due = ref.watch(duePlansProvider(id)).value ?? const [];
     final overdue = due.where((d) => d.due.status == DueStatus.overdue).length;
     final soon = due.where((d) => d.due.status == DueStatus.dueSoon).length;
 
