@@ -4,6 +4,7 @@ import 'package:motorz/core/domain/model/app_theme_mode.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/providers/theme_providers.dart';
+import 'package:motorz/ui/pages/settings/widgets/vehicles_section.widget.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -39,6 +40,8 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 24),
+          const VehiclesSection(),
+          const SizedBox(height: 32),
           Text('Apparence', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SegmentedButton<AppThemeMode>(

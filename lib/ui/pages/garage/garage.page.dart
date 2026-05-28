@@ -55,21 +55,10 @@ class GaragePage extends ConsumerWidget {
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DashboardPage())),
           ),
           IconButton(
-            tooltip: 'Rejoindre un véhicule',
-            icon: const Icon(Icons.group_add_outlined),
-            onPressed: () => _showJoinDialog(context, ref),
-          ),
-          IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push(AppRoutes.settings),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('addVehicleFab'),
-        onPressed: () => context.push(AppRoutes.newVehicle),
-        icon: const Icon(Icons.add),
-        label: const Text('Véhicule'),
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(syncServiceProvider).syncNow(),
@@ -94,7 +83,8 @@ class GaragePage extends ConsumerWidget {
                 else ...[
                   _SectionHeader('Mes véhicules', colors: colors),
                   if (owned.isEmpty)
-                    _MutedLine('Aucun véhicule. Ajoute ton premier véhicule.', colors: colors),
+                    _MutedLine('Aucun véhicule à toi. Ajoutes-en un depuis les réglages.',
+                        colors: colors),
                   ...owned.map((v) => _spaced(VehicleCard(vehicle: v))),
                   if (shared.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -112,44 +102,6 @@ class GaragePage extends ConsumerWidget {
 
   Widget _spaced(Widget child) =>
       Padding(padding: const EdgeInsets.only(bottom: 10), child: child);
-
-  Future<void> _showJoinDialog(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rejoindre un véhicule'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(labelText: 'Code du véhicule'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Rejoindre'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (code == null || code.isEmpty || !context.mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(vehicleRemoteApiProvider).join(code);
-      await ref.read(syncServiceProvider).syncNow();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Véhicule ajouté à « Partagés avec moi ».')),
-      );
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Code invalide ou serveur indisponible.')),
-      );
-    }
-  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -208,9 +160,15 @@ class _EmptyGarage extends StatelessWidget {
           Text('Ton garage est vide', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            'Ajoute un véhicule pour suivre pleins, entretien et échéances.',
+            'Ajoute un véhicule depuis les réglages pour suivre pleins, entretien et échéances.',
             textAlign: TextAlign.center,
             style: TextStyle(color: colors.textMuted),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: () => context.push(AppRoutes.settings),
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Gérer mes véhicules'),
           ),
         ],
       ),
