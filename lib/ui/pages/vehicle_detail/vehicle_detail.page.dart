@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
@@ -19,9 +18,7 @@ import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart
 import 'package:motorz/ui/pages/finances/finances.page.dart';
 import 'package:motorz/ui/pages/maintenance_detail/maintenance_detail.page.dart';
 import 'package:motorz/ui/pages/stats/stats.page.dart';
-import 'package:motorz/ui/pages/vehicle_form/vehicle_form.page.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
-import 'package:motorz/ui/router/app_router.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
 
@@ -115,16 +112,6 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
     return Scaffold(
       appBar: AppBar(
         title: Text(v.nickname),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) => _onMenu(value, isOwner),
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: Text('Modifier')),
-              if (isOwner) const PopupMenuItem(value: 'share', child: Text('Partager')),
-              if (isOwner) const PopupMenuItem(value: 'delete', child: Text('Supprimer')),
-            ],
-          ),
-        ],
         bottom: TabBar(
           controller: _tab,
           isScrollable: true,
@@ -151,44 +138,6 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
         ],
       ),
     );
-  }
-
-  Future<void> _onMenu(String value, bool isOwner) async {
-    final v = widget.vehicle;
-    switch (value) {
-      case 'edit':
-        await Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => VehicleFormPage(existing: v)));
-      case 'share':
-        showDialog<void>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Code de partage'),
-            content: Text(
-              v.shareCode == null
-                  ? 'Le code sera disponible après la prochaine synchronisation.'
-                  : 'Communique ce code à la personne, elle le saisit depuis « Rejoindre un véhicule » :\n\n${v.shareCode}',
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-          ),
-        );
-      case 'delete':
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Supprimer le véhicule ?'),
-            content: const Text('Cette action est définitive.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
-            ],
-          ),
-        );
-        if (ok == true) {
-          await ref.read(vehicleRepositoryProvider).delete(v);
-          if (mounted) context.go(AppRoutes.garage);
-        }
-    }
   }
 }
 
