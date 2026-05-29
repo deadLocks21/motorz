@@ -41,6 +41,20 @@ class MediaRemoteApi {
     }
   }
 
+  /// Télécharge les octets bruts d'un média via le proxy authentifié `/media/:id`.
+  Future<Uint8List> download(String id) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        '/media/$id',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return Uint8List.fromList(res.data!);
+    } catch (e, st) {
+      _logger?.error('media.download.failed', error: e, stack: st);
+      rethrow;
+    }
+  }
+
   Future<void> delete(String id) async {
     try {
       await _dio.delete<void>('/media/$id');

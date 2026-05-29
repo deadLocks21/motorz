@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
@@ -104,10 +107,24 @@ class MediaGrid extends ConsumerWidget {
                       headers: headers,
                       colors: colors,
                       onDelete: () => _delete(ref, m),
+                      onOpenPdf: () => _openPdf(context, ref, m),
                     ))
                 .toList(),
           ),
       ],
+    );
+  }
+
+  /// Ouvre la visionneuse PDF intégrée immédiatement ; le téléchargement des
+  /// octets (proxy authentifié) se fait dans la page avec un loader.
+  void _openPdf(BuildContext context, WidgetRef ref, MediaItem m) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _PdfViewerPage(
+          title: m.originalFilename ?? 'Document',
+          bytesFuture: ref.read(mediaRemoteApiProvider).download(m.id.value),
+        ),
+      ),
     );
   }
 
@@ -132,6 +149,7 @@ class _MediaTile extends StatelessWidget {
     required this.headers,
     required this.colors,
     required this.onDelete,
+    required this.onOpenPdf,
   });
 
   final MediaItem item;
@@ -139,11 +157,12 @@ class _MediaTile extends StatelessWidget {
   final Map<String, String> headers;
   final AppColors colors;
   final VoidCallback onDelete;
+  final VoidCallback onOpenPdf;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: item.isPhoto ? () => _openPhoto(context) : null,
+      onTap: item.isPhoto ? () => _openPhoto(context) : onOpenPdf,
       onLongPress: () => _confirmDelete(context),
       child: Container(
         width: 104,
@@ -209,6 +228,49 @@ class _MediaTile extends StatelessWidget {
             child: const Text('Supprimer'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Visionneuse PDF intégrée (rendu Flutter via pdfx) — multipage, zoom.
+/// Ouvre immédiatement et affiche un loader pendant le téléchargement des octets.
+class _PdfViewerPage extends StatefulWidget {
+  const _PdfViewerPage({required this.title, required this.bytesFuture});
+  final String title;
+  final Future<Uint8List> bytesFuture;
+
+  @override
+  State<_PdfViewerPage> createState() => _PdfViewerPageState();
+}
+
+class _PdfViewerPageState extends State<_PdfViewerPage> {
+  PdfControllerPinch? _controller;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title, overflow: TextOverflow.ellipsis)),
+      body: FutureBuilder<Uint8List>(
+        future: widget.bytesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return const Center(child: Text('Impossible d\'ouvrir le document.'));
+          }
+          _controller ??= PdfControllerPinch(
+            document: PdfDocument.openData(snapshot.data!),
+          );
+          return PdfViewPinch(controller: _controller!);
+        },
       ),
     );
   }
