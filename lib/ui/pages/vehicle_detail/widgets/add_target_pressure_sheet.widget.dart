@@ -75,6 +75,25 @@ class _AddTargetPressureSheetState extends ConsumerState<_AddTargetPressureSheet
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _delete() async {
+    final ex = widget.existing;
+    if (ex == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer la cible ?'),
+        content: Text('« ${ex.label} » sera retirée.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(targetPressureRepositoryProvider).delete(ex);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -114,6 +133,14 @@ class _AddTargetPressureSheetState extends ConsumerState<_AddTargetPressureSheet
           ),
           const SizedBox(height: 20),
           FilledButton(onPressed: _saving ? null : _save, child: const Text('Enregistrer la cible')),
+          if (widget.existing != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _delete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Supprimer'),
+            ),
+          ],
         ],
       ),
     );

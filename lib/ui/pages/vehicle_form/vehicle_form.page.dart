@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
-import 'package:motorz/core/domain/model/target_pressure.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
@@ -377,23 +376,6 @@ class _TargetPressuresSection extends ConsumerWidget {
   const _TargetPressuresSection({required this.vehicleId});
   final String vehicleId;
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, TargetPressure t) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Supprimer la cible ?'),
-        content: Text('« ${t.label} » sera retirée.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await ref.read(targetPressureRepositoryProvider).delete(t);
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
@@ -411,10 +393,6 @@ class _TargetPressuresSection extends ConsumerWidget {
                 iconColor: colors.accent,
                 title: t.label,
                 subtitle: 'AV ${formatBar(t.front)} · AR ${formatBar(t.rear)}',
-                trailing: IconButton(
-                  icon: Icon(Icons.delete_outline, color: colors.textMuted),
-                  onPressed: () => _confirmDelete(context, ref, t),
-                ),
                 colors: colors,
                 onTap: () =>
                     showAddTargetPressureSheet(context, ref, vehicleId: vehicleId, existing: t),
