@@ -48,7 +48,7 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _oneShot = e != null ? !e.isRecurring : false;
+    _oneShot = e != null ? !e.isRecurring : true;
     _title = TextEditingController(text: e?.title ?? '');
     _intervalKm = TextEditingController(text: e?.intervalKm?.toString() ?? '');
     _intervalMonths = TextEditingController(text: e?.intervalMonths?.toString() ?? '');
@@ -120,8 +120,8 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
             const SizedBox(height: 16),
             SegmentedButton<bool>(
               segments: const [
-                ButtonSegment(value: false, label: Text('Échéance'), icon: Icon(Icons.autorenew)),
                 ButtonSegment(value: true, label: Text('Ponctuelle'), icon: Icon(Icons.task_alt)),
+                ButtonSegment(value: false, label: Text('Échéance'), icon: Icon(Icons.autorenew)),
               ],
               selected: {_oneShot},
               onSelectionChanged: (s) => setState(() => _oneShot = s.first),
