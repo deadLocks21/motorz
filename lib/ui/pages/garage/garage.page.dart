@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/sync/sync_service.dart';
-import 'package:motorz/ui/pages/dashboard/dashboard.page.dart';
 import 'package:motorz/ui/pages/garage/widgets/sync_status_action.widget.dart';
 import 'package:motorz/ui/pages/garage/widgets/vehicle_card.widget.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
@@ -48,12 +47,6 @@ class GaragePage extends ConsumerWidget {
         title: const MotorzWordmark(fontSize: 24),
         actions: [
           const SyncStatusAction(),
-          IconButton(
-            tooltip: 'Tableau de bord',
-            icon: const Icon(Icons.insights_outlined),
-            onPressed: () =>
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DashboardPage())),
-          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push(AppRoutes.settings),
