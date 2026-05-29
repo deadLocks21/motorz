@@ -4,9 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
+import 'package:motorz/core/domain/model/target_pressure.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/add_target_pressure_sheet.widget.dart';
+import 'package:motorz/ui/providers/vehicle_data_providers.dart';
+import 'package:motorz/ui/theme/app_colors.dart';
+import 'package:motorz/ui/utils/format.dart';
+import 'package:motorz/ui/widgets/entry_card.widget.dart';
+import 'package:motorz/ui/widgets/section_header.widget.dart';
 
 /// Création (ou édition) d'un véhicule. La saisie est locale-first : le
 /// véhicule apparaît immédiatement, le code de partage arrive à la synchro.
@@ -19,7 +26,9 @@ class VehicleFormPage extends ConsumerStatefulWidget {
   ConsumerState<VehicleFormPage> createState() => _VehicleFormPageState();
 }
 
-class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
+class _VehicleFormPageState extends ConsumerState<VehicleFormPage>
+    with SingleTickerProviderStateMixin {
+  TabController? _tab;
   late final TextEditingController _nickname;
   late final TextEditingController _make;
   late final TextEditingController _model;
@@ -33,6 +42,7 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
   late VehicleType _type;
   FuelType? _fuelType;
   DateTime? _firstReg;
+  late double _lossRate;
   bool _saving = false;
 
   @override
@@ -52,10 +62,18 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
     _type = v?.type ?? VehicleType.voiture;
     _fuelType = v?.fuelType;
     _firstReg = v?.firstRegistrationDate != null ? DateTime.tryParse(v!.firstRegistrationDate!) : null;
+    _lossRate = v?.tireMonthlyLossBar ?? Vehicle.defaultTireMonthlyLossBar;
+    // Onglets uniquement en édition : en création, les cibles n'ont pas encore
+    // de véhicule auquel se rattacher.
+    if (v != null) {
+      _tab = TabController(length: 2, vsync: this)
+        ..addListener(() => setState(() {})); // affiche le FAB seulement sur Pneus
+    }
   }
 
   @override
   void dispose() {
+    _tab?.dispose();
     for (final c in [_nickname, _make, _model, _year, _trim, _plate, _vin, _engineCc, _powerHp, _color]) {
       c.dispose();
     }
@@ -92,6 +110,7 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
       color: _emptyToNull(_color.text),
       firstRegistrationDate: _firstReg?.toIso8601String().substring(0, 10),
       photoMediaId: base?.photoMediaId,
+      tireMonthlyLossBar: _lossRate,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(vehicleRepositoryProvider).save(vehicle);
@@ -100,12 +119,73 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
 
   String? _emptyToNull(String s) => s.trim().isEmpty ? null : s.trim();
 
+  /// Taux de perte : enregistrement immédiat (comme les cibles), indépendant du
+  /// bouton « Enregistrer » de l'identité.
+  Future<void> _setLossRate(double v) async {
+    final clamped = double.parse(v.clamp(0.0, 1.0).toStringAsFixed(2));
+    setState(() => _lossRate = clamped);
+    final base = widget.existing;
+    if (base != null) {
+      await ref
+          .read(vehicleRepositoryProvider)
+          .save(base.copyWith(tireMonthlyLossBar: clamped, updatedAt: DateTime.now().toUtc()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
     return Scaffold(
-      appBar: AppBar(title: Text(editing ? 'Modifier le véhicule' : 'Nouveau véhicule')),
-      body: ListView(
+      appBar: AppBar(
+        title: Text(editing ? 'Modifier le véhicule' : 'Nouveau véhicule'),
+        bottom: _tab == null
+            ? null
+            : TabBar(
+                controller: _tab,
+                tabs: const [Tab(text: 'Identité'), Tab(text: 'Pneus')],
+              ),
+      ),
+      floatingActionButton: _tab != null && _tab!.index == 1
+          ? FloatingActionButton(
+              onPressed: () => showAddTargetPressureSheet(context, ref,
+                  vehicleId: widget.existing!.id.value),
+              child: const Icon(Icons.add),
+            )
+          : null,
+      body: _tab == null
+          ? _identityTab(editing)
+          : TabBarView(
+              controller: _tab,
+              children: [
+                _identityTab(editing),
+                ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                  children: [
+                    const SectionHeader('Perte de pression normale'),
+                    Text(
+                      'Perte attendue avec le temps. Une roue qui se dégonfle plus '
+                      'vite est signalée en rouge sur les relevés.',
+                      style: TextStyle(color: context.appColors.textMuted, fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 8),
+                    _LossRateStepper(
+                      value: _lossRate,
+                      onChanged: _setLossRate,
+                      colors: context.appColors,
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    _TargetPressuresSection(vehicleId: widget.existing!.id.value),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _identityTab(bool editing) {
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
@@ -246,7 +326,101 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage> {
             child: Text(editing ? 'Enregistrer' : 'Ajouter au garage'),
           ),
         ],
+      );
+  }
+}
+
+/// Réglage du taux de perte mensuel par pas de 0,05 bar.
+class _LossRateStepper extends StatelessWidget {
+  const _LossRateStepper({required this.value, required this.onChanged, required this.colors});
+
+  final double value;
+  final ValueChanged<double> onChanged;
+  final AppColors colors;
+
+  static const _step = 0.05;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text('${formatBar(value)} / mois',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove),
+            onPressed: value <= 0 ? null : () => onChanged(value - _step),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: value >= 1 ? null : () => onChanged(value + _step),
+          ),
+        ],
       ),
     );
   }
 }
+
+/// Sous-éditeur des pressions cibles, à enregistrement immédiat (chaque ajout /
+/// modification / suppression est persisté tout de suite, indépendamment du
+/// bouton « Enregistrer » de l'identité). Ces valeurs ne se saisissent qu'une
+/// fois : leur place est ici, dans la fiche, plutôt que mêlées au journal des
+/// relevés (onglet Pneus du détail).
+class _TargetPressuresSection extends ConsumerWidget {
+  const _TargetPressuresSection({required this.vehicleId});
+  final String vehicleId;
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, TargetPressure t) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer la cible ?'),
+        content: Text('« ${t.label} » sera retirée.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(targetPressureRepositoryProvider).delete(t);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final targets = ref.watch(targetPressuresProvider(vehicleId)).value ?? const [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeader('Pressions cibles'),
+        if (targets.isEmpty)
+          Text('Aucune cible. Ajoute « à vide », « en charge »…',
+              style: TextStyle(color: colors.textMuted))
+        else
+          ...targets.map((t) => EntryCard(
+                icon: Icons.adjust,
+                iconColor: colors.accent,
+                title: t.label,
+                subtitle: 'AV ${formatBar(t.front)} · AR ${formatBar(t.rear)}',
+                trailing: IconButton(
+                  icon: Icon(Icons.delete_outline, color: colors.textMuted),
+                  onPressed: () => _confirmDelete(context, ref, t),
+                ),
+                colors: colors,
+                onTap: () =>
+                    showAddTargetPressureSheet(context, ref, vehicleId: vehicleId, existing: t),
+              )),
+      ],
+    );
+  }
+}
+

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
+import 'package:motorz/ui/providers/vehicle_data_providers.dart';
+import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
 
@@ -50,6 +52,8 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
   late final TextEditingController _odo;
   late final List<String> _positions;
   late final Map<String, TextEditingController> _fields;
+  String? _targetId;
+  late DateTime _date;
   bool _saving = false;
 
   @override
@@ -63,6 +67,8 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
       for (final p in _positions)
         p: TextEditingController(text: ex?.pressures[p]?.toString() ?? ''),
     };
+    _targetId = ex?.targetPressureId?.value;
+    _date = ex?.date.toLocal() ?? DateTime.now();
   }
 
   @override
@@ -91,9 +97,10 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
     final entry = TirePressureEntry(
       id: ex?.id ?? UuidValue.generate(),
       vehicleId: ex?.vehicleId ?? UuidValue.parse(widget.vehicleId),
-      date: ex?.date ?? DateTime.now().toUtc(),
+      date: _date.toUtc(),
       odometer: odo,
       pressures: pressures,
+      targetPressureId: _targetId != null ? UuidValue.parse(_targetId!) : null,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(tirePressureRepositoryProvider).save(entry);
@@ -122,6 +129,11 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final targets = ref.watch(targetPressuresProvider(widget.vehicleId)).value ?? const [];
+    // La cible mémorisée a pu être supprimée : on ne la pré-sélectionne que si
+    // elle existe encore.
+    final selectableId =
+        targets.any((t) => t.id.value == _targetId) ? _targetId : null;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: Column(
@@ -138,6 +150,22 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
             decoration: const InputDecoration(labelText: 'Kilométrage', suffixText: 'km'),
           ),
           const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _date,
+                firstDate: DateTime(1950),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) setState(() => _date = picked);
+            },
+            child: InputDecorator(
+              decoration: const InputDecoration(labelText: 'Date'),
+              child: Text(formatDate(_date)),
+            ),
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -152,6 +180,24 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
                     ))
                 .toList(),
           ),
+          if (targets.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              initialValue: selectableId,
+              decoration: const InputDecoration(
+                labelText: 'Gonflé à',
+                helperText: 'La pression à laquelle tu viens de remplir (= un remplissage).',
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('— (simple relevé)')),
+                ...targets.map((t) => DropdownMenuItem(
+                      value: t.id.value,
+                      child: Text('${t.label} · AV ${formatBar(t.front)} · AR ${formatBar(t.rear)}'),
+                    )),
+              ],
+              onChanged: (v) => setState(() => _targetId = v),
+            ),
+          ],
           const SizedBox(height: 20),
           FilledButton(onPressed: _saving ? null : _save, child: const Text('Enregistrer')),
           if (widget.existing != null) ...[

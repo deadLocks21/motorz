@@ -8,6 +8,7 @@ import 'package:motorz/ui/pages/finances/widgets/add_ownership_sheet.widget.dart
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
+import 'package:motorz/ui/widgets/section_header.widget.dart';
 
 /// Écran Finances : TCO, mon achat, postes de coût, historique de possession.
 class FinancesPage extends ConsumerWidget {
@@ -30,7 +31,7 @@ class FinancesPage extends ConsumerWidget {
         children: [
           if (tco != null) _TcoCard(tco: tco, colors: colors),
           const SizedBox(height: 24),
-          _header(context, 'Mon achat', onAdd: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: true, existing: mine)),
+          SectionHeader('Mon achat', onAdd: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: true, existing: mine)),
           if (mine == null)
             Text('Renseigne ton achat (prix, km, date) pour calculer le TCO.',
                 style: TextStyle(color: colors.textMuted))
@@ -47,7 +48,7 @@ class FinancesPage extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 24),
-          _header(context, 'Assurance & autres frais',
+          SectionHeader('Assurance & autres frais',
               onAdd: () => showAddCostSheet(context, ref, vehicleId: vehicleId)),
           if (costs.isEmpty)
             Text('Aucun frais. Ajoute l\'assurance ou un poste libre.',
@@ -74,7 +75,7 @@ class FinancesPage extends ConsumerWidget {
                   ),
                 )),
           const SizedBox(height: 24),
-          _header(context, 'Historique de possession',
+          SectionHeader('Historique de possession',
               onAdd: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: false)),
           if (ownerships.isEmpty)
             Text('Aucune période enregistrée.', style: TextStyle(color: colors.textMuted))
@@ -91,15 +92,6 @@ class FinancesPage extends ConsumerWidget {
     );
   }
 
-  Widget _header(BuildContext context, String label, {required VoidCallback onAdd}) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      children: [
-        Expanded(child: Text(label, style: Theme.of(context).textTheme.titleMedium)),
-        TextButton.icon(onPressed: onAdd, icon: const Icon(Icons.add, size: 18), label: const Text('Ajouter')),
-      ],
-    ),
-  );
 }
 
 class _TcoCard extends StatelessWidget {

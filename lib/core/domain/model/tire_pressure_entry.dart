@@ -9,6 +9,10 @@ class TirePressureEntry {
   final DateTime date;
   final int odometer;
   final Map<String, double> pressures;
+
+  /// Cible à laquelle ce relevé se compare (selon la charge au moment du
+  /// contrôle : « à vide », « en charge »…). Null = pas de comparaison.
+  final UuidValue? targetPressureId;
   final String? notes;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -21,6 +25,7 @@ class TirePressureEntry {
     required this.pressures,
     required this.updatedAt,
     this.createdByUserId,
+    this.targetPressureId,
     this.notes,
     this.deletedAt,
   });

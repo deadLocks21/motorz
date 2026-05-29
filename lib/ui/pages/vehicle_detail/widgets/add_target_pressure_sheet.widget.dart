@@ -10,28 +10,41 @@ Future<void> showAddTargetPressureSheet(
   BuildContext context,
   WidgetRef ref, {
   required String vehicleId,
+  TargetPressure? existing,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _AddTargetPressureSheet(vehicleId: vehicleId),
+    builder: (_) => _AddTargetPressureSheet(vehicleId: vehicleId, existing: existing),
   );
 }
 
 class _AddTargetPressureSheet extends ConsumerStatefulWidget {
-  const _AddTargetPressureSheet({required this.vehicleId});
+  const _AddTargetPressureSheet({required this.vehicleId, this.existing});
   final String vehicleId;
+  final TargetPressure? existing;
 
   @override
   ConsumerState<_AddTargetPressureSheet> createState() => _AddTargetPressureSheetState();
 }
 
 class _AddTargetPressureSheetState extends ConsumerState<_AddTargetPressureSheet> {
-  final _label = TextEditingController();
-  final _front = TextEditingController();
-  final _rear = TextEditingController();
+  late final TextEditingController _label;
+  late final TextEditingController _front;
+  late final TextEditingController _rear;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _label = TextEditingController(text: e?.label ?? '');
+    _front = TextEditingController(text: e?.front != null ? _fmt(e!.front!) : '');
+    _rear = TextEditingController(text: e?.rear != null ? _fmt(e!.rear!) : '');
+  }
+
+  static String _fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(1) : v.toString();
 
   @override
   void dispose() {
@@ -49,9 +62,10 @@ class _AddTargetPressureSheetState extends ConsumerState<_AddTargetPressureSheet
       return;
     }
     setState(() => _saving = true);
+    final base = widget.existing;
     final target = TargetPressure(
-      id: UuidValue.generate(),
-      vehicleId: UuidValue.parse(widget.vehicleId),
+      id: base?.id ?? UuidValue.generate(),
+      vehicleId: base?.vehicleId ?? UuidValue.parse(widget.vehicleId),
       label: label,
       front: _num(_front.text),
       rear: _num(_rear.text),
@@ -70,7 +84,8 @@ class _AddTargetPressureSheetState extends ConsumerState<_AddTargetPressureSheet
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Pression cible', style: Theme.of(context).textTheme.titleLarge),
+          Text(widget.existing != null ? 'Modifier la cible' : 'Pression cible',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           TextField(
             controller: _label,

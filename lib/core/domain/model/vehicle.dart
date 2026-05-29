@@ -21,8 +21,15 @@ class Vehicle {
   final String? firstRegistrationDate; // YYYY-MM-DD
   final String? color;
   final UuidValue? photoMediaId;
+
+  /// Perte de pression « normale » attendue, en bar par mois. Sert de référence
+  /// pour signaler une roue qui se dégonfle anormalement vite. Null → défaut.
+  final double? tireMonthlyLossBar;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+
+  /// Perte mensuelle par défaut (bar) quand le véhicule n'en définit pas.
+  static const defaultTireMonthlyLossBar = 0.1;
 
   Vehicle({
     required this.id,
@@ -43,10 +50,14 @@ class Vehicle {
     this.firstRegistrationDate,
     this.color,
     this.photoMediaId,
+    this.tireMonthlyLossBar,
     this.deletedAt,
   }) : assert(nickname.trim().isNotEmpty, 'nickname cannot be empty');
 
   int get wheelCount => type.wheelCount;
+
+  /// Taux de perte effectif (valeur du véhicule ou défaut).
+  double get tireMonthlyLoss => tireMonthlyLossBar ?? defaultTireMonthlyLossBar;
 
   /// Libellé compact « marque modèle (année) ».
   String get descriptor {
@@ -71,6 +82,7 @@ class Vehicle {
     String? firstRegistrationDate,
     String? color,
     UuidValue? photoMediaId,
+    double? tireMonthlyLossBar,
     DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
@@ -92,6 +104,7 @@ class Vehicle {
       firstRegistrationDate: firstRegistrationDate ?? this.firstRegistrationDate,
       color: color ?? this.color,
       photoMediaId: photoMediaId ?? this.photoMediaId,
+      tireMonthlyLossBar: tireMonthlyLossBar ?? this.tireMonthlyLossBar,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

@@ -5,21 +5,23 @@ import 'package:motorz/core/application/services/maintenance_derivation.service.
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/target_pressure.dart';
+import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
-import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
-import 'package:motorz/ui/pages/vehicle_detail/widgets/add_target_pressure_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_tire_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
 import 'package:motorz/ui/pages/finances/finances.page.dart';
 import 'package:motorz/ui/pages/maintenance_detail/maintenance_detail.page.dart';
 import 'package:motorz/ui/pages/stats/stats.page.dart';
+import 'package:motorz/ui/pages/vehicle_form/vehicle_form.page.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
+import 'package:motorz/ui/widgets/entry_card.widget.dart';
 
 class VehicleDetailPage extends ConsumerWidget {
   const VehicleDetailPage({super.key, required this.vehicleId});
@@ -132,7 +134,7 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
           _FuelTab(vehicleId: _id),
           _MaintenanceTab(vehicleId: _id),
           _TasksTab(vehicleId: _id),
-          _TiresTab(vehicleId: _id, wheelCount: v.wheelCount),
+          _TiresTab(vehicle: v),
           DocumentsTab(vehicleId: _id),
         ],
       ),
@@ -302,91 +304,6 @@ class _DueRow extends StatelessWidget {
   }
 }
 
-/// Tuile uniforme de toutes les listes du véhicule (pleins, entretien, à prévoir,
-/// pneus) : carte avec icône colorée dans un carré arrondi, titre, contenu
-/// secondaire (texte ou widget), trailing optionnel (coût, pastille…) et chevron
-/// signalant que la ligne ouvre quelque chose. Tap → action principale.
-class _EntryCard extends StatelessWidget {
-  const _EntryCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    this.subtitle,
-    this.subtitleWidget,
-    this.trailing,
-    this.showChevron = false,
-    required this.colors,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String? subtitle;
-  final Widget? subtitleWidget;
-  final Widget? trailing;
-
-  /// Affiche le chevron `›` (la ligne ouvre une page de détail). Pour les lignes
-  /// qui ouvrent directement l'édition, on le laisse à false.
-  final bool showChevron;
-  final AppColors colors;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(subtitle!, style: TextStyle(color: colors.textMuted, fontSize: 12.5)),
-                    ],
-                    if (subtitleWidget != null) ...[
-                      const SizedBox(height: 6),
-                      subtitleWidget!,
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                trailing!,
-              ],
-              if (showChevron) ...[
-                const SizedBox(width: 2),
-                Icon(Icons.chevron_right, color: colors.textMuted),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.label, required this.color});
@@ -453,7 +370,7 @@ class _FuelTab extends ConsumerWidget {
           itemBuilder: (context, i) {
             final e = entries[i];
             // Tap → édition (la suppression vit dans la feuille d'édition).
-            return _EntryCard(
+            return EntryCard(
               icon: Icons.local_gas_station,
               iconColor: colors.accent,
               title: '${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}',
@@ -496,7 +413,7 @@ class _MaintenanceTab extends ConsumerWidget {
             final op = operations[i];
             final opLines = linesByOp[op.id.value] ?? const [];
             final title = op.title ?? MaintenanceDerivationService.deriveTitle(opLines);
-            return _EntryCard(
+            return EntryCard(
               icon: Icons.build,
               iconColor: colors.accent,
               title: title,
@@ -551,7 +468,7 @@ class _TasksTab extends ConsumerWidget {
             DueStatus.dueSoon => (colors.statusSoon, 'Bientôt'),
             DueStatus.upcoming => (colors.statusOk, d.due.hasTrigger ? 'À venir' : 'À faire'),
           };
-          return _EntryCard(
+          return EntryCard(
             icon: d.plan.isRecurring ? Icons.autorenew : Icons.task_alt,
             iconColor: statusColor,
             title: d.plan.title,
@@ -611,19 +528,25 @@ class _TasksTab extends ConsumerWidget {
 }
 
 class _TiresTab extends ConsumerWidget {
-  const _TiresTab({required this.vehicleId, required this.wheelCount});
-  final String vehicleId;
-  final int wheelCount;
+  const _TiresTab({required this.vehicle});
+  final Vehicle vehicle;
+
+  String get vehicleId => vehicle.id.value;
+  int get wheelCount => vehicle.wheelCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
     final targets = ref.watch(targetPressuresProvider(vehicleId)).value ?? const [];
     final entriesAsync = ref.watch(tirePressuresProvider(vehicleId));
-    final reference = targets.isNotEmpty ? targets.first : null;
+    final targetById = {for (final t in targets) t.id.value: t};
+    final lossPerMonth = vehicle.tireMonthlyLoss;
 
-    double? targetFor(String pos) =>
-        reference == null ? null : (pos.startsWith('AV') ? reference.front : reference.rear);
+    // Rappel non-éditable des cibles : l'édition vit dans la fiche
+    // (« Modifier le véhicule »), pas dans le journal des relevés.
+    void openVehicleForm() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => VehicleFormPage(existing: vehicle)),
+        );
 
     return entriesAsync.when(
       skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
@@ -633,55 +556,75 @@ class _TiresTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Pressions cibles',
-                      style: Theme.of(context).textTheme.titleMedium),
-                ),
-                TextButton.icon(
-                  onPressed: () => showAddTargetPressureSheet(context, ref, vehicleId: vehicleId),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Cible'),
-                ),
-              ],
-            ),
             if (targets.isEmpty)
-              Text('Aucune cible. Ajoute « à vide », « en charge »…',
-                  style: TextStyle(color: colors.textMuted))
-            else
-              ...targets.map((t) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    leading: Icon(Icons.adjust, color: colors.textMuted),
-                    title: Text(t.label),
-                    subtitle: Text('AV ${formatBar(t.front)} · AR ${formatBar(t.rear)}'),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete_outline, color: colors.textMuted),
-                      onPressed: () => ref.read(targetPressureRepositoryProvider).delete(t),
-                    ),
-                  )),
-            const Divider(height: 24),
+              OutlinedButton.icon(
+                onPressed: openVehicleForm,
+                icon: const Icon(Icons.adjust, size: 18),
+                label: const Text('Définir une pression cible'),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, left: 2),
+                child: Text('PRESSIONS CIBLES',
+                    style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6)),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: targets.map((t) => _TargetChip(target: t, colors: colors)).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
             Text('Relevés', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             if (entries.isEmpty)
               Text('Aucun relevé. Touche + pour en ajouter.', style: TextStyle(color: colors.textMuted))
             else
               ...entries.asMap().entries.map((me) {
+                final i = me.key;
                 final e = me.value;
-                final isLatest = me.key == 0;
-                // Tap → édition du relevé (suppression dans la feuille).
-                return _EntryCard(
+                // Le relevé est un « remplissage » s'il porte la cible gonflée.
+                final fillTarget = targetById[e.targetPressureId?.value];
+                // Dernier remplissage antérieur (relevés triés du + récent au +
+                // ancien) : sert de référence « pression du précédent remplissage ».
+                TirePressureEntry? prevFill;
+                for (var j = i + 1; j < entries.length; j++) {
+                  if (entries[j].targetPressureId != null) {
+                    prevFill = entries[j];
+                    break;
+                  }
+                }
+                // Roue la plus gonflée du relevé : référence « interne ».
+                final maxBar = e.pressures.values.isEmpty
+                    ? null
+                    : e.pressures.values.reduce((a, b) => a > b ? a : b);
+                // Perte normale attendue depuis le dernier remplissage (selon le
+                // temps écoulé et le taux mensuel du véhicule).
+                final months = prevFill == null
+                    ? null
+                    : e.date.difference(prevFill.date).inDays / 30.0;
+                return EntryCard(
                   icon: Icons.tire_repair,
                   iconColor: colors.accent,
                   title: '${formatDate(e.date)} · ${formatKm(e.odometer)}',
+                  subtitle: fillTarget != null ? 'Gonflé à « ${fillTarget.label} »' : null,
                   subtitleWidget: Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: e.pressures.entries.map((p) {
-                      final target = targetFor(p.key);
-                      // Sous-gonflé si ≥ 0,3 bar sous la cible (dernier relevé).
-                      final low = isLatest && target != null && p.value < target - 0.3;
+                      // Problème (rouge) si la roue est sous la plus gonflée du
+                      // relevé OU sous la pression attendue au dernier
+                      // remplissage (perte plus rapide que la normale). Sans marge.
+                      final lowVsMax = maxBar != null && p.value < maxBar;
+                      final prevBar = prevFill?.pressures[p.key];
+                      final expected =
+                          prevBar != null && months != null ? prevBar - lossPerMonth * months : null;
+                      final lowVsFill = expected != null && p.value < expected;
+                      final low = lowVsMax || lowVsFill;
                       final color = low ? colors.statusOverdue : colors.textPrimary;
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -700,15 +643,48 @@ class _TiresTab extends ConsumerWidget {
                       vehicleId: vehicleId, wheelCount: wheelCount, existing: e),
                 );
               }),
-            if (reference != null && entries.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text('Comparé à la cible « ${reference.label} ». Rouge = sous-gonflé.',
-                    style: TextStyle(color: colors.textMuted, fontSize: 12)),
-              ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Puce compacte d'une pression cible dans l'onglet Pneus, en lecture seule
+/// (l'édition vit dans la fiche « Modifier le véhicule ») : label puis
+/// « AV … · AR … ».
+class _TargetChip extends StatelessWidget {
+  const _TargetChip({required this.target, required this.colors});
+
+  final TargetPressure target;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outline),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.adjust, size: 14, color: colors.textMuted),
+              const SizedBox(width: 6),
+              Text(target.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text('AV ${formatBar(target.front)} · AR ${formatBar(target.rear)}',
+              style: TextStyle(color: colors.textMuted, fontSize: 12)),
+        ],
+      ),
     );
   }
 }
