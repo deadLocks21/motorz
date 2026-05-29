@@ -164,6 +164,25 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _delete() async {
+    final ex = widget.existing;
+    if (ex == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer ce plein ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(fuelRepositoryProvider).delete(ex);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   /// Champ « Station ». Tant qu'aucune station n'a été saisie, simple champ
   /// texte. Dès qu'on en a, autocomplétion sur les stations déjà connues
   /// ([stations]) : la liste s'ouvre au focus (chevron) et se filtre à la
@@ -297,6 +316,14 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
             onPressed: _saving ? null : _save,
             child: Text(isEditing ? 'Enregistrer les modifications' : 'Enregistrer le plein'),
           ),
+          if (isEditing) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _delete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Supprimer'),
+            ),
+          ],
         ],
       ),
     );

@@ -4,7 +4,6 @@ import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
-import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
@@ -133,7 +132,7 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
           _FuelTab(vehicleId: _id),
           _MaintenanceTab(vehicleId: _id),
           _TasksTab(vehicleId: _id),
-          _TiresTab(vehicleId: _id),
+          _TiresTab(vehicleId: _id, wheelCount: v.wheelCount),
           DocumentsTab(vehicleId: _id),
         ],
       ),
@@ -303,32 +302,38 @@ class _DueRow extends StatelessWidget {
   }
 }
 
-/// Carte d'échéance (onglet À prévoir) : icône colorée selon nature + statut,
-/// titre, échéance concrète, pastille de statut. Tap → édition.
-class _DueCard extends StatelessWidget {
-  const _DueCard({
+/// Tuile uniforme de toutes les listes du véhicule (pleins, entretien, à prévoir,
+/// pneus) : carte avec icône colorée dans un carré arrondi, titre, contenu
+/// secondaire (texte ou widget), trailing optionnel (coût, pastille…) et chevron
+/// signalant que la ligne ouvre quelque chose. Tap → action principale.
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({
+    required this.icon,
+    required this.iconColor,
     required this.title,
-    required this.due,
-    required this.recurring,
+    this.subtitle,
+    this.subtitleWidget,
+    this.trailing,
+    this.showChevron = false,
     required this.colors,
     required this.onTap,
   });
 
+  final IconData icon;
+  final Color iconColor;
   final String title;
-  final DueInfo due;
-  final bool recurring;
+  final String? subtitle;
+  final Widget? subtitleWidget;
+  final Widget? trailing;
+
+  /// Affiche le chevron `›` (la ligne ouvre une page de détail). Pour les lignes
+  /// qui ouvrent directement l'édition, on le laisse à false.
+  final bool showChevron;
   final AppColors colors;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (statusColor, statusLabel) = switch (due.status) {
-      DueStatus.overdue => (colors.statusOverdue, 'En retard'),
-      DueStatus.dueSoon => (colors.statusSoon, 'Bientôt'),
-      DueStatus.upcoming => (colors.statusOk, due.hasTrigger ? 'À venir' : 'À faire'),
-    };
-    final detail = _dueDetail(due);
-
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
       child: InkWell(
@@ -342,10 +347,10 @@ class _DueCard extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.13),
+                  color: iconColor.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(recurring ? Icons.autorenew : Icons.task_alt, color: statusColor, size: 22),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -356,15 +361,25 @@ class _DueCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                    if (detail != null) ...[
+                    if (subtitle != null) ...[
                       const SizedBox(height: 2),
-                      Text(detail, style: TextStyle(color: colors.textMuted, fontSize: 12.5)),
+                      Text(subtitle!, style: TextStyle(color: colors.textMuted, fontSize: 12.5)),
+                    ],
+                    if (subtitleWidget != null) ...[
+                      const SizedBox(height: 6),
+                      subtitleWidget!,
                     ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              _StatusPill(label: statusLabel, color: statusColor),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
+              if (showChevron) ...[
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right, color: colors.textMuted),
+              ],
             ],
           ),
         ),
@@ -432,84 +447,25 @@ class _FuelTab extends ConsumerWidget {
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (entries) {
         if (entries.isEmpty) return const _EmptyTab('Aucun plein. Touche + pour en ajouter un.');
-        return ListView.separated(
+        return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           itemCount: entries.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, i) {
             final e = entries[i];
-            // Appui long (tactile) ou clic droit (desktop) → modifier / supprimer.
-            return GestureDetector(
-              onLongPressStart: (d) => _showEntryMenu(context, ref, e, d.globalPosition),
-              onSecondaryTapDown: (d) => _showEntryMenu(context, ref, e, d.globalPosition),
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.local_gas_station, color: colors.accent),
-                title: Text('${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}'),
-                subtitle: Text('${formatDateOrNull(e.date)}${e.station != null ? ' · ${e.station}' : ''}'),
-                trailing: Text(formatEur(e.totalCost), style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
+            // Tap → édition (la suppression vit dans la feuille d'édition).
+            return _EntryCard(
+              icon: Icons.local_gas_station,
+              iconColor: colors.accent,
+              title: '${formatKm(e.odometer)} · ${formatLiters(e.volumeLiters)}',
+              subtitle: '${formatDateOrNull(e.date)}${e.station != null ? ' · ${e.station}' : ''}',
+              trailing: Text(formatEur(e.totalCost), style: const TextStyle(fontWeight: FontWeight.w700)),
+              colors: colors,
+              onTap: () => showAddFuelSheet(context, ref, vehicleId: vehicleId, existing: e),
             );
           },
         );
       },
     );
-  }
-
-  /// Menu contextuel positionné au point de contact (doigt ou curseur).
-  Future<void> _showEntryMenu(
-      BuildContext context, WidgetRef ref, FuelEntry entry, Offset position) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final action = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromRect(position & const Size(40, 40), Offset.zero & overlay.size),
-      items: const [
-        PopupMenuItem(
-          value: 'edit',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            leading: Icon(Icons.edit_outlined),
-            title: Text('Modifier'),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            leading: Icon(Icons.delete_outline),
-            title: Text('Supprimer'),
-          ),
-        ),
-      ],
-    );
-    if (!context.mounted) return;
-    switch (action) {
-      case 'edit':
-        await showAddFuelSheet(context, ref, vehicleId: vehicleId, existing: entry);
-      case 'delete':
-        await _confirmDelete(context, ref, entry);
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, FuelEntry entry) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Supprimer ce plein ?'),
-        content: Text('${formatDateOrNull(entry.date)} · ${formatKm(entry.odometer)}'
-            '${entry.volumeLiters != null ? ' · ${formatLiters(entry.volumeLiters)}' : ''}\n'
-            'Cette action est définitive.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await ref.read(fuelRepositoryProvider).delete(entry);
-    }
   }
 }
 
@@ -533,24 +489,25 @@ class _MaintenanceTab extends ConsumerWidget {
       error: (e, _) => Center(child: Text('Erreur : $e')),
       data: (operations) {
         if (operations.isEmpty) return const _EmptyTab('Aucune opération d\'entretien enregistrée.');
-        return ListView.separated(
+        return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           itemCount: operations.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final op = operations[i];
             final opLines = linesByOp[op.id.value] ?? const [];
             final title = op.title ?? MaintenanceDerivationService.deriveTitle(opLines);
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.build, color: colors.accent),
-              title: Text(title),
-              subtitle: Text('${formatDate(op.date)} · ${formatKm(op.odometer)}'
-                  '${op.provider != null ? ' · ${op.provider}' : ''}'),
+            return _EntryCard(
+              icon: Icons.build,
+              iconColor: colors.accent,
+              title: title,
+              subtitle: '${formatDate(op.date)} · ${formatKm(op.odometer)}'
+                  '${op.provider != null ? ' · ${op.provider}' : ''}',
               trailing: Text(
                 formatEur(MaintenanceDerivationService.operationCost(opLines)),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+              showChevron: true,
+              colors: colors,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => MaintenanceOperationDetailPage(operation: op)),
               ),
@@ -588,13 +545,22 @@ class _TasksTab extends ConsumerWidget {
         final prochaines =
             items.where((d) => d.due.status == DueStatus.upcoming && d.due.hasTrigger).toList();
 
-        Widget row(DuePlan d) => _DueCard(
-              title: d.plan.title,
-              due: d.due,
-              recurring: d.plan.isRecurring,
-              colors: colors,
-              onTap: () => showPlanSheet(context, ref, vehicleId: vehicleId, existing: d.plan),
-            );
+        Widget row(DuePlan d) {
+          final (statusColor, statusLabel) = switch (d.due.status) {
+            DueStatus.overdue => (colors.statusOverdue, 'En retard'),
+            DueStatus.dueSoon => (colors.statusSoon, 'Bientôt'),
+            DueStatus.upcoming => (colors.statusOk, d.due.hasTrigger ? 'À venir' : 'À faire'),
+          };
+          return _EntryCard(
+            icon: d.plan.isRecurring ? Icons.autorenew : Icons.task_alt,
+            iconColor: statusColor,
+            title: d.plan.title,
+            subtitle: _dueDetail(d.due),
+            trailing: _StatusPill(label: statusLabel, color: statusColor),
+            colors: colors,
+            onTap: () => showPlanSheet(context, ref, vehicleId: vehicleId, existing: d.plan),
+          );
+        }
 
         Widget sectionHeader(String label, int count) => Padding(
               padding: const EdgeInsets.fromLTRB(2, 16, 2, 6),
@@ -645,8 +611,9 @@ class _TasksTab extends ConsumerWidget {
 }
 
 class _TiresTab extends ConsumerWidget {
-  const _TiresTab({required this.vehicleId});
+  const _TiresTab({required this.vehicleId, required this.wheelCount});
   final String vehicleId;
+  final int wheelCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -703,36 +670,34 @@ class _TiresTab extends ConsumerWidget {
               ...entries.asMap().entries.map((me) {
                 final e = me.value;
                 final isLatest = me.key == 0;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${formatDate(e.date)} · ${formatKm(e.odometer)}',
-                          style: TextStyle(color: colors.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: e.pressures.entries.map((p) {
-                          final target = targetFor(p.key);
-                          // Sous-gonflé si ≥ 0,3 bar sous la cible (sur le dernier relevé).
-                          final low = isLatest && target != null && p.value < target - 0.3;
-                          final color = low ? colors.statusOverdue : colors.textPrimary;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: (low ? colors.statusOverdue : colors.outline)
-                                  .withValues(alpha: low ? 0.12 : 0.35),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text('${p.key} ${formatBar(p.value)}',
-                                style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                // Tap → édition du relevé (suppression dans la feuille).
+                return _EntryCard(
+                  icon: Icons.tire_repair,
+                  iconColor: colors.accent,
+                  title: '${formatDate(e.date)} · ${formatKm(e.odometer)}',
+                  subtitleWidget: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: e.pressures.entries.map((p) {
+                      final target = targetFor(p.key);
+                      // Sous-gonflé si ≥ 0,3 bar sous la cible (dernier relevé).
+                      final low = isLatest && target != null && p.value < target - 0.3;
+                      final color = low ? colors.statusOverdue : colors.textPrimary;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: (low ? colors.statusOverdue : colors.outline)
+                              .withValues(alpha: low ? 0.12 : 0.35),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text('${p.key} ${formatBar(p.value)}',
+                            style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+                      );
+                    }).toList(),
                   ),
+                  colors: colors,
+                  onTap: () => showAddTireSheet(context, ref,
+                      vehicleId: vehicleId, wheelCount: wheelCount, existing: e),
                 );
               }),
             if (reference != null && entries.isNotEmpty)

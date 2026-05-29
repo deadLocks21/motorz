@@ -62,6 +62,27 @@ class _MaintenanceOperationDetailPageState
     if (mounted && updated != null) setState(() => _operation = updated);
   }
 
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer cet entretien ?'),
+        content: const Text('L\'opération et ses postes seront supprimés. Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final lines = await ref.read(operationLinesProvider(_operation.id.value).future);
+    for (final l in lines) {
+      await ref.read(operationLineRepositoryProvider).delete(l);
+    }
+    await ref.read(operationRepositoryProvider).delete(_operation);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -78,6 +99,11 @@ class _MaintenanceOperationDetailPageState
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Modifier',
             onPressed: _edit,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Supprimer',
+            onPressed: _delete,
           ),
         ],
       ),

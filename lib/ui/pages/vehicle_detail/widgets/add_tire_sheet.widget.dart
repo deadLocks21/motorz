@@ -13,6 +13,7 @@ Future<void> showAddTireSheet(
   required String vehicleId,
   required int wheelCount,
   int? lastOdometer,
+  TirePressureEntry? existing,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -22,15 +23,24 @@ Future<void> showAddTireSheet(
       vehicleId: vehicleId,
       wheelCount: wheelCount,
       lastOdometer: lastOdometer,
+      existing: existing,
     ),
   );
 }
 
 class _AddTireSheet extends ConsumerStatefulWidget {
-  const _AddTireSheet({required this.vehicleId, required this.wheelCount, this.lastOdometer});
+  const _AddTireSheet({
+    required this.vehicleId,
+    required this.wheelCount,
+    this.lastOdometer,
+    this.existing,
+  });
   final String vehicleId;
   final int wheelCount;
   final int? lastOdometer;
+
+  /// Relevé à modifier (mode édition). Null → nouveau relevé.
+  final TirePressureEntry? existing;
 
   @override
   ConsumerState<_AddTireSheet> createState() => _AddTireSheetState();
@@ -45,9 +55,14 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
   @override
   void initState() {
     super.initState();
-    _odo = TextEditingController(text: widget.lastOdometer?.toString() ?? '');
+    final ex = widget.existing;
+    _odo = TextEditingController(
+        text: ex?.odometer.toString() ?? widget.lastOdometer?.toString() ?? '');
     _positions = widget.wheelCount == 2 ? ['AV', 'AR'] : ['AVG', 'AVD', 'ARG', 'ARD'];
-    _fields = {for (final p in _positions) p: TextEditingController()};
+    _fields = {
+      for (final p in _positions)
+        p: TextEditingController(text: ex?.pressures[p]?.toString() ?? ''),
+    };
   }
 
   @override
@@ -72,15 +87,35 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
       return;
     }
     setState(() => _saving = true);
+    final ex = widget.existing;
     final entry = TirePressureEntry(
-      id: UuidValue.generate(),
-      vehicleId: UuidValue.parse(widget.vehicleId),
-      date: DateTime.now().toUtc(),
+      id: ex?.id ?? UuidValue.generate(),
+      vehicleId: ex?.vehicleId ?? UuidValue.parse(widget.vehicleId),
+      date: ex?.date ?? DateTime.now().toUtc(),
       odometer: odo,
       pressures: pressures,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(tirePressureRepositoryProvider).save(entry);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _delete() async {
+    final ex = widget.existing;
+    if (ex == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer ce relevé ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(tirePressureRepositoryProvider).delete(ex);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -93,7 +128,8 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Relevé de pression', style: Theme.of(context).textTheme.titleLarge),
+          Text(widget.existing != null ? 'Modifier le relevé' : 'Relevé de pression',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           TextField(
             controller: _odo,
@@ -118,6 +154,14 @@ class _AddTireSheetState extends ConsumerState<_AddTireSheet> {
           ),
           const SizedBox(height: 20),
           FilledButton(onPressed: _saving ? null : _save, child: const Text('Enregistrer')),
+          if (widget.existing != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _delete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Supprimer'),
+            ),
+          ],
         ],
       ),
     );
