@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/finance.service.dart';
-import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/ui/pages/finances/widgets/add_cost_sheet.widget.dart';
-import 'package:motorz/ui/pages/finances/widgets/add_ownership_sheet.widget.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
@@ -19,34 +17,14 @@ class FinancesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.appColors;
     final tco = ref.watch(financeSummaryProvider(vehicleId)).value;
-    final ownerships = ref.watch(ownershipsProvider(vehicleId)).value ?? const [];
     final costs = ref.watch(costEntriesProvider(vehicleId)).value ?? const [];
-    final mine = FinanceService.myOwnership(ownerships);
-    final past = ownerships.where((o) => !o.isCurrent).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Finances & possession')),
+      appBar: AppBar(title: const Text('Finances')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (tco != null) _TcoCard(tco: tco, colors: colors),
-          const SizedBox(height: 24),
-          SectionHeader('Mon achat', onAdd: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: true, existing: mine)),
-          if (mine == null)
-            Text('Renseigne ton achat (prix, km, date) pour calculer le TCO.',
-                style: TextStyle(color: colors.textMuted))
-          else
-            Card(
-              child: ListTile(
-                title: Text(formatEur(mine.purchasePrice)),
-                subtitle: Text([
-                  if (mine.acquiredOdometer != null) formatKm(mine.acquiredOdometer),
-                  if (mine.acquiredDate != null) mine.acquiredDate,
-                ].whereType<String>().join(' · ')),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: true, existing: mine),
-              ),
-            ),
           const SizedBox(height: 24),
           SectionHeader('Assurance & autres frais',
               onAdd: () => showAddCostSheet(context, ref, vehicleId: vehicleId)),
@@ -74,19 +52,6 @@ class FinancesPage extends ConsumerWidget {
                     ],
                   ),
                 )),
-          const SizedBox(height: 24),
-          SectionHeader('Historique de possession',
-              onAdd: () => showOwnershipSheet(context, ref, vehicleId: vehicleId, isMine: false)),
-          if (ownerships.isEmpty)
-            Text('Aucune période enregistrée.', style: TextStyle(color: colors.textMuted))
-          else
-            ...ownerships.map((o) => _OwnershipTile(o: o, colors: colors)),
-          if (past.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('Ajoute les anciens propriétaires (nom, km, prix) jusqu\'à l\'achat initial.',
-                  style: TextStyle(color: colors.textMuted, fontSize: 12)),
-            ),
         ],
       ),
     );
@@ -148,30 +113,4 @@ class _TcoCard extends StatelessWidget {
       ],
     ),
   );
-}
-
-class _OwnershipTile extends StatelessWidget {
-  const _OwnershipTile({required this.o, required this.colors});
-  final Ownership o;
-  final AppColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    final who = o.isCurrent
-        ? 'Moi'
-        : [o.firstName, o.lastName].whereType<String>().join(' ').trim().isEmpty
-            ? 'Ancien propriétaire'
-            : '${o.firstName ?? ''} ${o.lastName ?? ''}'.trim();
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      leading: Icon(o.isCurrent ? Icons.person : Icons.person_outline, color: colors.textMuted),
-      title: Text(who, style: TextStyle(fontWeight: o.isCurrent ? FontWeight.w700 : FontWeight.w400)),
-      subtitle: Text([
-        if (o.acquiredOdometer != null) formatKm(o.acquiredOdometer),
-        if (o.purchasePrice != null) formatEur(o.purchasePrice),
-        if (o.acquiredDate != null) o.acquiredDate,
-      ].whereType<String>().join(' · ')),
-    );
-  }
 }

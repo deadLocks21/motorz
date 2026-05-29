@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:motorz/core/application/services/finance.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/ui/pages/finances/widgets/add_ownership_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_target_pressure_sheet.widget.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
 import 'package:motorz/ui/theme/app_colors.dart';
@@ -65,7 +67,7 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage>
     // Onglets uniquement en édition : en création, les cibles n'ont pas encore
     // de véhicule auquel se rattacher.
     if (v != null) {
-      _tab = TabController(length: 2, vsync: this)
+      _tab = TabController(length: 3, vsync: this)
         ..addListener(() => setState(() {})); // affiche le FAB seulement sur Pneus
     }
   }
@@ -141,16 +143,24 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage>
             ? null
             : TabBar(
                 controller: _tab,
-                tabs: const [Tab(text: 'Identité'), Tab(text: 'Pneus')],
+                tabs: const [Tab(text: 'Identité'), Tab(text: 'Pneus'), Tab(text: 'Possession')],
               ),
       ),
-      floatingActionButton: _tab != null && _tab!.index == 1
-          ? FloatingActionButton(
-              onPressed: () => showAddTargetPressureSheet(context, ref,
-                  vehicleId: widget.existing!.id.value),
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: _tab == null
+          ? null
+          : _tab!.index == 1
+              ? FloatingActionButton(
+                  onPressed: () => showAddTargetPressureSheet(context, ref,
+                      vehicleId: widget.existing!.id.value),
+                  child: const Icon(Icons.add),
+                )
+              : _tab!.index == 2
+                  ? FloatingActionButton(
+                      onPressed: () => showOwnershipSheet(context, ref,
+                          vehicleId: widget.existing!.id.value, isMine: false),
+                      child: const Icon(Icons.add),
+                    )
+                  : null,
       body: _tab == null
           ? _identityTab(editing)
           : TabBarView(
@@ -178,6 +188,7 @@ class _VehicleFormPageState extends ConsumerState<VehicleFormPage>
                     _TargetPressuresSection(vehicleId: widget.existing!.id.value),
                   ],
                 ),
+                _PossessionTab(vehicle: widget.existing!),
               ],
             ),
     );
@@ -397,6 +408,64 @@ class _TargetPressuresSection extends ConsumerWidget {
                 onTap: () =>
                     showAddTargetPressureSheet(context, ref, vehicleId: vehicleId, existing: t),
               )),
+      ],
+    );
+  }
+}
+
+/// Onglet Possession : la ligne « Moi » (toujours présente, même non saisie) en
+/// tête, suivie des anciens propriétaires. Le + flottant ajoute un ancien
+/// propriétaire ; toucher une tuile ouvre son édition. Saisies à enregistrement
+/// immédiat (via la bottom sheet), indépendantes du bouton « Enregistrer ».
+class _PossessionTab extends ConsumerWidget {
+  const _PossessionTab({required this.vehicle});
+  final Vehicle vehicle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final vehicleId = vehicle.id.value;
+    final ownerships = ref.watch(ownershipsProvider(vehicleId)).value ?? const [];
+    final mine = FinanceService.myOwnership(ownerships);
+    final past = ownerships.where((o) => !o.isCurrent).toList();
+
+    // Ligne « Moi » : valeurs saisies si elles existent, sinon un défaut affiché
+    // (0 km, date d'immatriculation, sans prix) qui n'est pas persisté tant que
+    // l'achat n'est pas réellement renseigné.
+    final mineSubtitle = [
+      formatKm(mine?.acquiredOdometer ?? 0),
+      if (mine?.purchasePrice != null) formatEur(mine!.purchasePrice),
+      mine?.acquiredDate ?? vehicle.firstRegistrationDate,
+    ].whereType<String>().join(' · ');
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      children: [
+        EntryCard(
+          icon: Icons.person,
+          iconColor: colors.accent,
+          title: 'Moi',
+          subtitle: mineSubtitle,
+          colors: colors,
+          onTap: () => showOwnershipSheet(context, ref,
+              vehicleId: vehicleId, isMine: true, existing: mine),
+        ),
+        ...past.map((o) {
+          final name = [o.firstName, o.lastName].whereType<String>().join(' ').trim();
+          return EntryCard(
+            icon: Icons.person_outline,
+            iconColor: colors.textMuted,
+            title: name.isEmpty ? 'Ancien propriétaire' : name,
+            subtitle: [
+              formatKm(o.acquiredOdometer ?? 0),
+              if (o.purchasePrice != null) formatEur(o.purchasePrice),
+              if (o.acquiredDate != null) o.acquiredDate,
+            ].whereType<String>().join(' · '),
+            colors: colors,
+            onTap: () => showOwnershipSheet(context, ref,
+                vehicleId: vehicleId, isMine: false, existing: o),
+          );
+        }),
       ],
     );
   }
