@@ -5,6 +5,7 @@ import 'package:motorz/core/application/services/maintenance_derivation.service.
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
+import 'package:motorz/core/domain/model/target_pressure.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
@@ -562,17 +563,20 @@ class _TiresTab extends ConsumerWidget {
                 label: const Text('Définir une pression cible'),
               )
             else ...[
-              Text('Pressions cibles', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              ...targets.map((t) => EntryCard(
-                    icon: Icons.adjust,
-                    iconColor: colors.accent,
-                    title: t.label,
-                    subtitle: 'AV ${formatBar(t.front)} · AR ${formatBar(t.rear)}',
-                    showChevron: true,
-                    colors: colors,
-                    onTap: openVehicleForm,
-                  )),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, left: 2),
+                child: Text('PRESSIONS CIBLES',
+                    style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6)),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: targets.map((t) => _TargetChip(target: t, colors: colors)).toList(),
+              ),
             ],
             const SizedBox(height: 16),
             Text('Relevés', style: Theme.of(context).textTheme.titleMedium),
@@ -642,6 +646,45 @@ class _TiresTab extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Puce compacte d'une pression cible dans l'onglet Pneus, en lecture seule
+/// (l'édition vit dans la fiche « Modifier le véhicule ») : label puis
+/// « AV … · AR … ».
+class _TargetChip extends StatelessWidget {
+  const _TargetChip({required this.target, required this.colors});
+
+  final TargetPressure target;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outline),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.adjust, size: 14, color: colors.textMuted),
+              const SizedBox(width: 6),
+              Text(target.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text('AV ${formatBar(target.front)} · AR ${formatBar(target.rear)}',
+              style: TextStyle(color: colors.textMuted, fontSize: 12)),
+        ],
+      ),
     );
   }
 }
