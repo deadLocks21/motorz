@@ -351,6 +351,103 @@ final class TargetPressureRepositoryProvider
 String _$targetPressureRepositoryHash() =>
     r'75a351f4926bbd5fbd4cf67266daa64c807759aa';
 
+@ProviderFor(tireRepository)
+final tireRepositoryProvider = TireRepositoryProvider._();
+
+final class TireRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<Tire>,
+          SyncableRepository<Tire>,
+          SyncableRepository<Tire>
+        >
+    with $Provider<SyncableRepository<Tire>> {
+  TireRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'tireRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$tireRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<Tire>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<Tire> create(Ref ref) {
+    return tireRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<Tire> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<Tire>>(value),
+    );
+  }
+}
+
+String _$tireRepositoryHash() => r'ea1b44870b4cbbd826a787a74dacd042b0524e2d';
+
+@ProviderFor(tireMountRepository)
+final tireMountRepositoryProvider = TireMountRepositoryProvider._();
+
+final class TireMountRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<TireMount>,
+          SyncableRepository<TireMount>,
+          SyncableRepository<TireMount>
+        >
+    with $Provider<SyncableRepository<TireMount>> {
+  TireMountRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'tireMountRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$tireMountRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<TireMount>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<TireMount> create(Ref ref) {
+    return tireMountRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<TireMount> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<TireMount>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$tireMountRepositoryHash() =>
+    r'48583b85c105aa4b437bf68faaf21a0122178c99';
+
 @ProviderFor(ownershipRepository)
 final ownershipRepositoryProvider = OwnershipRepositoryProvider._();
 

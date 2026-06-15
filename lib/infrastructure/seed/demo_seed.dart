@@ -5,6 +5,8 @@ import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
+import 'package:motorz/core/domain/model/tire.dart';
+import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
@@ -52,6 +54,12 @@ class DemoSeed {
     }
     for (final p in _plans(vehicleId)) {
       await _put(planCodec, p);
+    }
+    for (final t in _tires(vehicleId)) {
+      await _put(tireCodec, t);
+    }
+    for (final m in _tireMounts(vehicleId)) {
+      await _put(tireMountCodec, m);
     }
   }
 
@@ -200,6 +208,147 @@ class DemoSeed {
         title: 'Changer l\'ampoule de plaque',
         updatedAt: _seedAt,
       ),
+    ];
+  }
+
+  /// Inventaire de pneus : jeu été Michelin PS4S (avant d'origine, arrière
+  /// remplacés à 10 400 km — les 2 d'origine restent en stock), une roue de
+  /// secours, et un jeu hiver complet en stock.
+  List<Tire> _tires(UuidValue vehicleId) {
+    Tire t(
+      String suffix, {
+      String? brand,
+      String? model,
+      String? size,
+      RimMaterial? rim,
+      String? rimSpec,
+      TireSeason? season,
+      String? purchaseDate,
+      double? price,
+    }) =>
+        Tire(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000a$suffix'),
+          vehicleId: vehicleId,
+          brand: brand,
+          model: model,
+          size: size,
+          rimMaterial: rim,
+          rimSpec: rimSpec,
+          season: season,
+          purchaseDate: purchaseDate,
+          purchasePrice: price,
+          updatedAt: _seedAt,
+        );
+
+    const ps4s = (brand: 'Michelin', model: 'Pilot Sport 4S', size: '255/40 R19');
+    return [
+      // Avant d'origine (montés depuis la livraison).
+      t('0001',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2024-03-15',
+          price: 295),
+      t('0002',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2024-03-15',
+          price: 295),
+      // Arrière d'origine, déposés à 10 400 km (en stock désormais).
+      t('0003',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2024-03-15',
+          price: 295),
+      t('0004',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2024-03-15',
+          price: 295),
+      // Arrière neufs (remplacement 2025-11).
+      t('0005',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2025-11-05',
+          price: 330),
+      t('0006',
+          brand: ps4s.brand,
+          model: ps4s.model,
+          size: ps4s.size,
+          rim: RimMaterial.alu,
+          rimSpec: '9J×19 ET45',
+          season: TireSeason.ete,
+          purchaseDate: '2025-11-05',
+          price: 330),
+      // Roue de secours (galette).
+      t('0007', model: 'Galette', size: 'T135/90 R17', rim: RimMaterial.tole, purchaseDate: '2024-03-15'),
+      // Jeu hiver complet, en stock.
+      for (final n in ['0008', '0009', '000a', '000b'])
+        t(n,
+            brand: 'Michelin',
+            model: 'Pilot Alpin 5',
+            size: '245/45 R18',
+            rim: RimMaterial.tole,
+            season: TireSeason.hiver,
+            purchaseDate: '2024-11-02',
+            price: 210),
+    ];
+  }
+
+  /// Journal de montages : 4 pneus été montés (les arrière ayant été remplacés à
+  /// 10 400 km) + la galette au secours. Le jeu hiver n'a aucun montage (stock).
+  List<TireMount> _tireMounts(UuidValue vehicleId) {
+    TireMount m(
+      String suffix,
+      String tireSuffix,
+      String position,
+      int mountedOdo,
+      String mountedDate, {
+      int? dismountedOdo,
+      String? dismountedDate,
+    }) =>
+        TireMount(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000c$suffix'),
+          vehicleId: vehicleId,
+          tireId: UuidValue.parse('0a5c0000-0000-4000-8000-0000000a$tireSuffix'),
+          position: position,
+          mountedOdometer: mountedOdo,
+          mountedDate: mountedDate,
+          dismountedOdometer: dismountedOdo,
+          dismountedDate: dismountedDate,
+          updatedAt: _seedAt,
+        );
+
+    return [
+      m('0001', '0001', 'AVG', 50, '2024-03-15'),
+      m('0002', '0002', 'AVD', 50, '2024-03-15'),
+      // Arrière d'origine déposés lors du remplacement.
+      m('0003', '0003', 'ARG', 50, '2024-03-15', dismountedOdo: 10400, dismountedDate: '2025-11-05'),
+      m('0004', '0004', 'ARD', 50, '2024-03-15', dismountedOdo: 10400, dismountedDate: '2025-11-05'),
+      // Arrière neufs montés à 10 400 km.
+      m('0005', '0005', 'ARG', 10400, '2025-11-05'),
+      m('0006', '0006', 'ARD', 10400, '2025-11-05'),
+      // Galette au secours.
+      m('0007', '0007', 'SEC', 50, '2024-03-15'),
     ];
   }
 }

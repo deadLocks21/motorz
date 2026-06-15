@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
+import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
@@ -14,6 +15,9 @@ import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widge
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_tire_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/mount_tire_sheet.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/tire_inventory_sheet.widget.dart';
+import 'package:motorz/ui/widgets/section_header.widget.dart';
 import 'package:motorz/ui/pages/finances/finances.page.dart';
 import 'package:motorz/ui/pages/maintenance_detail/maintenance_detail.page.dart';
 import 'package:motorz/ui/pages/stats/stats.page.dart';
@@ -66,7 +70,15 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
 
-  static const _tabs = ['Vue d\'ensemble', 'Pleins', 'Entretien', 'À prévoir', 'Pneus', 'Docs'];
+  static const _tabs = [
+    'Vue d\'ensemble',
+    'Pleins',
+    'Entretien',
+    'À prévoir',
+    'Pneus',
+    'Pressions',
+    'Docs',
+  ];
 
   @override
   void initState() {
@@ -95,9 +107,11 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
       case 3:
         await showPlanSheet(context, ref, vehicleId: _id);
       case 4:
+        await showTireSheet(context, ref, vehicleId: _id);
+      case 5:
         await showAddTireSheet(context, ref,
             vehicleId: _id, wheelCount: widget.vehicle.wheelCount, lastOdometer: odo);
-      case 5:
+      case 6:
         await uploadDocument(context, ref, ownerType: 'vehicle', ownerId: _id);
       default:
         await showAddFuelSheet(context, ref,
@@ -135,6 +149,7 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
           _MaintenanceTab(vehicleId: _id),
           _TasksTab(vehicleId: _id),
           _TiresTab(vehicle: v),
+          _PressuresTab(vehicle: v),
           DocumentsTab(vehicleId: _id),
         ],
       ),
@@ -527,8 +542,67 @@ class _TasksTab extends ConsumerWidget {
   }
 }
 
+/// Onglet **Pneus** : la monte courante (grille des positions + secours) et
+/// l'inventaire des pneus possédés. Les pressions vivent dans l'onglet voisin.
 class _TiresTab extends ConsumerWidget {
   const _TiresTab({required this.vehicle});
+  final Vehicle vehicle;
+
+  String get vehicleId => vehicle.id.value;
+  int get wheelCount => vehicle.wheelCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final fleetAsync = ref.watch(tireFleetProvider(vehicleId));
+    return fleetAsync.when(
+      skipLoadingOnReload: true, // save → reload : garde la liste, pas de flash spinner
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Erreur : $e')),
+      data: (fleet) {
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 2),
+              child: Text('MONTE ACTUELLE',
+                  style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6)),
+            ),
+            _WheelMap(
+              wheelCount: wheelCount,
+              byPosition: fleet.byPosition,
+              colors: colors,
+              onTap: (position) => showMountTireSheet(context, ref,
+                  vehicleId: vehicleId, position: position, lastOdometer: fleet.currentOdometer),
+            ),
+            const SizedBox(height: 20),
+            SectionHeader('Inventaire',
+                onAdd: () => showTireSheet(context, ref, vehicleId: vehicleId), addLabel: 'Ajouter'),
+            if (fleet.inventory.isEmpty)
+              Text('Aucun pneu. Touche « Ajouter » pour en enregistrer un.',
+                  style: TextStyle(color: colors.textMuted))
+            else
+              ...fleet.inventory.map((row) => _TireCard(
+                    row: row,
+                    colors: colors,
+                    onTap: () =>
+                        showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
+                  )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Onglet **Pressions** : pressions cibles (rappel) et journal des relevés par
+/// roue, avec mise en évidence d'une roue qui se dégonfle anormalement vite.
+class _PressuresTab extends ConsumerWidget {
+  const _PressuresTab({required this.vehicle});
   final Vehicle vehicle;
 
   String get vehicleId => vehicle.id.value;
@@ -650,7 +724,7 @@ class _TiresTab extends ConsumerWidget {
   }
 }
 
-/// Puce compacte d'une pression cible dans l'onglet Pneus, en lecture seule
+/// Puce compacte d'une pression cible dans l'onglet Pressions, en lecture seule
 /// (l'édition vit dans la fiche « Modifier le véhicule ») : label puis
 /// « AV … · AR … ».
 class _TargetChip extends StatelessWidget {
@@ -685,6 +759,193 @@ class _TargetChip extends StatelessWidget {
               style: TextStyle(color: colors.textMuted, fontSize: 12)),
         ],
       ),
+    );
+  }
+}
+
+/// Schéma des roues (4 = 2×2, 2 = AV/AR empilés) + roue de secours, montrant le
+/// pneu monté à chaque position. Tap → feuille de montage/démontage.
+class _WheelMap extends StatelessWidget {
+  const _WheelMap({
+    required this.wheelCount,
+    required this.byPosition,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final int wheelCount;
+  final Map<String, MountedTire> byPosition;
+  final AppColors colors;
+  final void Function(String position) onTap;
+
+  Widget _cell(String position) =>
+      _WheelCell(position: position, mounted: byPosition[position], colors: colors, onTap: () => onTap(position));
+
+  @override
+  Widget build(BuildContext context) {
+    final wheels = wheelCount == 2
+        ? [
+            _cell('AV'),
+            const SizedBox(height: 10),
+            _cell('AR'),
+          ]
+        : [
+            // IntrinsicHeight : borne la hauteur de la rangée pour que `stretch`
+            // donne deux cellules d'égale hauteur (sinon hauteur infinie).
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: _cell('AVG')),
+                const SizedBox(width: 10),
+                Expanded(child: _cell('AVD')),
+              ]),
+            ),
+            const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: _cell('ARG')),
+                const SizedBox(width: 10),
+                Expanded(child: _cell('ARD')),
+              ]),
+            ),
+          ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ...wheels,
+        const SizedBox(height: 10),
+        _cell('SEC'),
+      ],
+    );
+  }
+}
+
+/// Cellule d'une position de roue : code de position (ou « Secours »), pneu monté
+/// (marque/modèle + taille + km roulés) ou « Vide ». Accentuée si occupée.
+class _WheelCell extends StatelessWidget {
+  const _WheelCell({
+    required this.position,
+    required this.mounted,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final String position;
+  final MountedTire? mounted;
+  final AppColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = mounted;
+    final filled = m != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: filled ? colors.accent.withValues(alpha: 0.10) : colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: filled ? colors.accent.withValues(alpha: 0.5) : colors.outline),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.trip_origin, size: 14, color: filled ? colors.accent : colors.textMuted),
+                const SizedBox(width: 6),
+                Text(position == spareWheelPosition ? 'Secours' : position,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (filled) ...[
+              Text(m.tire.descriptor,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              if (m.tire.size != null && m.tire.size!.isNotEmpty)
+                Text(m.tire.size!, style: TextStyle(color: colors.textMuted, fontSize: 12)),
+              if (position != spareWheelPosition) ...[
+                const SizedBox(height: 2),
+                Text(m.kmRolled != null ? '${formatKm(m.kmRolled)} roulés' : '—',
+                    style: TextStyle(color: colors.textMuted, fontSize: 11.5)),
+              ],
+            ] else
+              Text('Vide', style: TextStyle(color: colors.textMuted)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Carte d'un pneu de l'inventaire : marque/modèle, specs (taille · jante ·
+/// saison · état), et en trailing sa position (ou « Stock ») + km roulés.
+class _TireCard extends StatelessWidget {
+  const _TireCard({required this.row, required this.colors, required this.onTap});
+
+  final TireInventoryRow row;
+  final AppColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = row.tire;
+    final specs = [
+      if (t.size != null && t.size!.isNotEmpty) t.size!,
+      if (t.rimMaterial != null) t.rimMaterial!.label,
+      if (t.season != null) t.season!.label,
+      t.condition.label,
+    ].join(' · ');
+    return EntryCard(
+      icon: Icons.trip_origin,
+      iconColor: colors.accent,
+      title: t.descriptor,
+      subtitle: specs,
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _PositionBadge(position: row.position, colors: colors),
+          if (row.kmRolled != null) ...[
+            const SizedBox(height: 4),
+            Text(formatKm(row.kmRolled), style: TextStyle(color: colors.textMuted, fontSize: 12)),
+          ],
+        ],
+      ),
+      colors: colors,
+      onTap: onTap,
+    );
+  }
+}
+
+/// Pastille de position d'un pneu : code de roue (accent) si monté, « Stock »
+/// (muet) sinon.
+class _PositionBadge extends StatelessWidget {
+  const _PositionBadge({required this.position, required this.colors});
+
+  final String? position;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final mounted = position != null;
+    final label = position == null
+        ? 'Stock'
+        : (position == spareWheelPosition ? 'Secours' : position!);
+    final c = mounted ? colors.accent : colors.textMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: mounted ? 0.13 : 0.10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label,
+          style: TextStyle(color: c, fontWeight: FontWeight.w700, fontSize: 11.5)),
     );
   }
 }

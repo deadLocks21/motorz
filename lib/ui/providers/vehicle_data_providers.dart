@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/finance.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
+import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
 import 'package:motorz/core/domain/model/enums.dart';
@@ -13,6 +14,8 @@ import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
+import 'package:motorz/core/domain/model/tire.dart';
+import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
@@ -239,6 +242,118 @@ Future<List<TargetPressure>> targetPressures(Ref ref, String vehicleId) async {
   return list;
 }
 
+/// Inventaire de pneus du véhicule (montés + en stock).
+@riverpod
+Future<List<Tire>> tires(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  final list = await ref.watch(tireRepositoryProvider).listForVehicle(vehicleId);
+  list.sort((a, b) => a.descriptor.toLowerCase().compareTo(b.descriptor.toLowerCase()));
+  return list;
+}
+
+/// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+@riverpod
+Future<List<TireMount>> tireMounts(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  return ref.watch(tireMountRepositoryProvider).listForVehicle(vehicleId);
+}
+
+/// Parc de pneus prêt à afficher : pneu monté par position + inventaire ordonné
+/// (montés d'abord, puis stock par saison/marque) avec km roulés dérivés.
+typedef TireInventoryRow = ({Tire tire, String? position, int? kmRolled});
+typedef TireFleet = ({
+  Map<String, MountedTire> byPosition,
+  List<TireInventoryRow> inventory,
+  int? currentOdometer,
+});
+
+@riverpod
+Future<TireFleet> tireFleet(Ref ref, String vehicleId) async {
+  final tires = await ref.watch(tiresProvider(vehicleId).future);
+  final mounts = await ref.watch(tireMountsProvider(vehicleId).future);
+  final odo = await ref.watch(currentOdometerProvider(vehicleId).future);
+  final byPosition = TireService.mountedByPosition(tires, mounts, odo);
+  final positionByTire = <String, String>{
+    for (final entry in byPosition.entries) entry.value.tire.id.value: entry.key,
+  };
+  final rows = [
+    for (final t in tires)
+      (
+        tire: t,
+        position: positionByTire[t.id.value],
+        kmRolled: TireService.kmRolled(t.id.value, mounts, odo),
+      ),
+  ]..sort(_compareInventoryRows);
+  return (byPosition: byPosition, inventory: rows, currentOdometer: odo);
+}
+
+const _positionOrder = ['AVG', 'AVD', 'ARG', 'ARD', 'AV', 'AR', 'SEC'];
+int _positionRank(String? p) {
+  if (p == null) return 1000; // stock après les montés
+  final i = _positionOrder.indexOf(p);
+  return i < 0 ? 999 : i;
+}
+
+int _seasonRank(TireSeason? s) => switch (s) {
+  TireSeason.ete => 0,
+  TireSeason.hiver => 1,
+  TireSeason.quatreSaisons => 2,
+  TireSeason.circuit => 3,
+  null => 4,
+};
+
+int _compareInventoryRows(TireInventoryRow a, TireInventoryRow b) {
+  final byPos = _positionRank(a.position).compareTo(_positionRank(b.position));
+  if (byPos != 0) return byPos;
+  final bySeason = _seasonRank(a.tire.season).compareTo(_seasonRank(b.tire.season));
+  if (bySeason != 0) return bySeason;
+  return a.tire.descriptor.toLowerCase().compareTo(b.tire.descriptor.toLowerCase());
+}
+
+/// Marques de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Marque ». Voir [rankTireBrands].
+@riverpod
+Future<List<String>> knownTireBrands(Ref ref) async {
+  ref.watch(storeChangesProvider);
+  return rankTireBrands(await ref.watch(tireRepositoryProvider).listAll());
+}
+
+@visibleForTesting
+List<String> rankTireBrands(List<Tire> tires) => _rankByFrequency(tires.map((t) => t.brand));
+
+/// Tailles de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Taille ». Voir [rankTireSizes].
+@riverpod
+Future<List<String>> knownTireSizes(Ref ref) async {
+  ref.watch(storeChangesProvider);
+  return rankTireSizes(await ref.watch(tireRepositoryProvider).listAll());
+}
+
+@visibleForTesting
+List<String> rankTireSizes(List<Tire> tires) => _rankByFrequency(tires.map((t) => t.size));
+
+/// Ordonne des valeurs de champ libre pour l'autocomplétion : fréquence globale
+/// décroissante puis alphabétique, dédoublonnage insensible à la casse (première
+/// orthographe conservée). Calque allégé de [rankStations] — pas de notion de
+/// récence (marque/taille de pneu varient peu dans le temps).
+List<String> _rankByFrequency(Iterable<String?> values) {
+  final total = <String, int>{};
+  final labels = <String, String>{};
+  for (final raw in values) {
+    final v = raw?.trim();
+    if (v == null || v.isEmpty) continue;
+    final key = v.toLowerCase();
+    total.update(key, (n) => n + 1, ifAbsent: () => 1);
+    labels.putIfAbsent(key, () => v);
+  }
+  final keys = labels.keys.toList()
+    ..sort((a, b) {
+      final byTotal = total[b]!.compareTo(total[a]!);
+      return byTotal != 0 ? byTotal : a.compareTo(b);
+    });
+  return [for (final k in keys) labels[k]!];
+}
+
 @riverpod
 Future<List<Ownership>> ownerships(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
@@ -309,7 +424,9 @@ Future<int?> currentOdometer(Ref ref, String vehicleId) async {
   final fuel = await ref.watch(fuelEntriesProvider(vehicleId).future);
   final ops = await ref.watch(operationsProvider(vehicleId).future);
   final tires = await ref.watch(tirePressuresProvider(vehicleId).future);
-  return VehicleStatsService.currentOdometer(fuel: fuel, operations: ops, tires: tires);
+  final mounts = await ref.watch(tireMountsProvider(vehicleId).future);
+  return VehicleStatsService.currentOdometer(
+      fuel: fuel, operations: ops, tires: tires, mounts: mounts);
 }
 
 @riverpod

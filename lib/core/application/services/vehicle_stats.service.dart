@@ -1,19 +1,24 @@
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
+import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 
 /// Calculs dérivés d'un véhicule — faits **localement** (offline-first).
 abstract final class VehicleStatsService {
-  /// Km courant = MAX(odometer) sur toutes les saisies.
+  /// Km courant = MAX(odometer) sur toutes les saisies (pleins, entretien,
+  /// relevés de pression, et bornes de montage/démontage des pneus).
   static int? currentOdometer({
     List<FuelEntry> fuel = const [],
     List<Operation> operations = const [],
     List<TirePressureEntry> tires = const [],
+    List<TireMount> mounts = const [],
   }) {
     final odos = <int>[
       ...fuel.map((e) => e.odometer).whereType<int>(),
       ...operations.map((e) => e.odometer),
       ...tires.map((e) => e.odometer),
+      ...mounts.map((e) => e.mountedOdometer),
+      ...mounts.map((e) => e.dismountedOdometer).whereType<int>(),
     ];
     if (odos.isEmpty) return null;
     return odos.reduce((a, b) => a > b ? a : b);

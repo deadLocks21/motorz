@@ -904,6 +904,341 @@ final class TargetPressuresFamily extends $Family
   String toString() => r'targetPressuresProvider';
 }
 
+/// Inventaire de pneus du véhicule (montés + en stock).
+
+@ProviderFor(tires)
+final tiresProvider = TiresFamily._();
+
+/// Inventaire de pneus du véhicule (montés + en stock).
+
+final class TiresProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Tire>>,
+          List<Tire>,
+          FutureOr<List<Tire>>
+        >
+    with $FutureModifier<List<Tire>>, $FutureProvider<List<Tire>> {
+  /// Inventaire de pneus du véhicule (montés + en stock).
+  TiresProvider._({
+    required TiresFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tiresProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tiresHash();
+
+  @override
+  String toString() {
+    return r'tiresProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<Tire>> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<Tire>> create(Ref ref) {
+    final argument = this.argument as String;
+    return tires(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TiresProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tiresHash() => r'9ee7378abd682730a38fb7cc642808fb69bcea00';
+
+/// Inventaire de pneus du véhicule (montés + en stock).
+
+final class TiresFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<Tire>>, String> {
+  TiresFamily._()
+    : super(
+        retry: null,
+        name: r'tiresProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Inventaire de pneus du véhicule (montés + en stock).
+
+  TiresProvider call(String vehicleId) =>
+      TiresProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'tiresProvider';
+}
+
+/// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+
+@ProviderFor(tireMounts)
+final tireMountsProvider = TireMountsFamily._();
+
+/// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+
+final class TireMountsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<TireMount>>,
+          List<TireMount>,
+          FutureOr<List<TireMount>>
+        >
+    with $FutureModifier<List<TireMount>>, $FutureProvider<List<TireMount>> {
+  /// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+  TireMountsProvider._({
+    required TireMountsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tireMountsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tireMountsHash();
+
+  @override
+  String toString() {
+    return r'tireMountsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<TireMount>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<TireMount>> create(Ref ref) {
+    final argument = this.argument as String;
+    return tireMounts(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TireMountsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tireMountsHash() => r'7234ec22408ebbd80753d49a68ba2144b6fed3ce';
+
+/// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+
+final class TireMountsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<TireMount>>, String> {
+  TireMountsFamily._()
+    : super(
+        retry: null,
+        name: r'tireMountsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Journal de montages du véhicule (intervalles ouverts = pneus montés).
+
+  TireMountsProvider call(String vehicleId) =>
+      TireMountsProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'tireMountsProvider';
+}
+
+@ProviderFor(tireFleet)
+final tireFleetProvider = TireFleetFamily._();
+
+final class TireFleetProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TireFleet>,
+          TireFleet,
+          FutureOr<TireFleet>
+        >
+    with $FutureModifier<TireFleet>, $FutureProvider<TireFleet> {
+  TireFleetProvider._({
+    required TireFleetFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tireFleetProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tireFleetHash();
+
+  @override
+  String toString() {
+    return r'tireFleetProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<TireFleet> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TireFleet> create(Ref ref) {
+    final argument = this.argument as String;
+    return tireFleet(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TireFleetProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tireFleetHash() => r'0e1071b6ebc2d2bf6c29ce34f0498dc39af83413';
+
+final class TireFleetFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<TireFleet>, String> {
+  TireFleetFamily._()
+    : super(
+        retry: null,
+        name: r'tireFleetProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  TireFleetProvider call(String vehicleId) =>
+      TireFleetProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'tireFleetProvider';
+}
+
+/// Marques de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Marque ». Voir [rankTireBrands].
+
+@ProviderFor(knownTireBrands)
+final knownTireBrandsProvider = KnownTireBrandsProvider._();
+
+/// Marques de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Marque ». Voir [rankTireBrands].
+
+final class KnownTireBrandsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<String>>,
+          List<String>,
+          FutureOr<List<String>>
+        >
+    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+  /// Marques de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+  /// « Marque ». Voir [rankTireBrands].
+  KnownTireBrandsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'knownTireBrandsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$knownTireBrandsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<String>> create(Ref ref) {
+    return knownTireBrands(ref);
+  }
+}
+
+String _$knownTireBrandsHash() => r'857bd94c25534e19b555607268c7bd7280740e53';
+
+/// Tailles de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Taille ». Voir [rankTireSizes].
+
+@ProviderFor(knownTireSizes)
+final knownTireSizesProvider = KnownTireSizesProvider._();
+
+/// Tailles de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+/// « Taille ». Voir [rankTireSizes].
+
+final class KnownTireSizesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<String>>,
+          List<String>,
+          FutureOr<List<String>>
+        >
+    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+  /// Tailles de pneus déjà saisies (tous véhicules) — autocomplétion du champ
+  /// « Taille ». Voir [rankTireSizes].
+  KnownTireSizesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'knownTireSizesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$knownTireSizesHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<String>> create(Ref ref) {
+    return knownTireSizes(ref);
+  }
+}
+
+String _$knownTireSizesHash() => r'ea9a7a294d55ef3047ad0fef56db899a1a625336';
+
 @ProviderFor(ownerships)
 final ownershipsProvider = OwnershipsFamily._();
 
@@ -1439,7 +1774,7 @@ final class CurrentOdometerProvider
   }
 }
 
-String _$currentOdometerHash() => r'85401e108b19facecb4da8c222d519728c31eeac';
+String _$currentOdometerHash() => r'e5664c4299d58e3b7c2b35b896241b8e21ee12ba';
 
 /// Km courant dérivé localement (MAX odometer toutes saisies).
 

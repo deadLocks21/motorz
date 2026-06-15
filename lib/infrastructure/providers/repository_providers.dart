@@ -9,6 +9,8 @@ import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
+import 'package:motorz/core/domain/model/tire.dart';
+import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/core/domain/services/syncable.repository.dart';
@@ -49,6 +51,12 @@ SyncableRepository<TirePressureEntry> tirePressureRepository(Ref ref) =>
 @riverpod
 SyncableRepository<TargetPressure> targetPressureRepository(Ref ref) =>
     _build(ref, targetPressureCodec);
+
+@riverpod
+SyncableRepository<Tire> tireRepository(Ref ref) => _build(ref, tireCodec);
+
+@riverpod
+SyncableRepository<TireMount> tireMountRepository(Ref ref) => _build(ref, tireMountCodec);
 
 @riverpod
 SyncableRepository<Ownership> ownershipRepository(Ref ref) => _build(ref, ownershipCodec);
