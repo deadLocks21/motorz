@@ -9,6 +9,8 @@ import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/core/domain/model/ownership.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
+import 'package:motorz/core/domain/model/tire.dart';
+import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
@@ -293,6 +295,84 @@ final targetPressureCodec = SyncCodec<TargetPressure>(
     'label': e.label,
     'front': e.front,
     'rear': e.rear,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+// Inventaire de pneus : un pneu+jante physique. Position & km roulés dérivés du
+// journal de montages (tire_mounts), pas stockés ici.
+final tireCodec = SyncCodec<Tire>(
+  resource: 'tires',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => e.vehicleId.value,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => Tire(
+    id: _id(m['id']),
+    vehicleId: _id(m['vehicle_id']),
+    createdByUserId: _idN(m['created_by_user_id']),
+    brand: m['brand'] as String?,
+    model: m['model'] as String?,
+    size: m['size'] as String?,
+    rimMaterial: RimMaterial.fromWire(m['rim_material'] as String?),
+    rimSpec: m['rim_spec'] as String?,
+    season: TireSeason.fromWire(m['season'] as String?),
+    condition: TireCondition.fromWire(m['condition'] as String?),
+    purchaseDate: m['purchase_date'] as String?,
+    purchasePrice: doubleOrNull(m['purchase_price']),
+    notes: m['notes'] as String?,
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'vehicle_id': e.vehicleId.value,
+    'created_by_user_id': e.createdByUserId?.value,
+    'brand': e.brand,
+    'model': e.model,
+    'size': e.size,
+    'rim_material': e.rimMaterial?.wire,
+    'rim_spec': e.rimSpec,
+    'season': e.season?.wire,
+    'condition': e.condition.wire,
+    'purchase_date': e.purchaseDate,
+    'purchase_price': e.purchasePrice,
+    'notes': e.notes,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+// Journal de montages : intervalle (position, km montage → km démontage) d'un
+// pneu. Intervalle ouvert (dismounted_odometer null) = pneu monté actuellement.
+final tireMountCodec = SyncCodec<TireMount>(
+  resource: 'tire_mounts',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => e.vehicleId.value,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => TireMount(
+    id: _id(m['id']),
+    vehicleId: _id(m['vehicle_id']),
+    tireId: _id(m['tire_id']),
+    position: m['position'] as String,
+    mountedOdometer: (m['mounted_odometer'] as num).toInt(),
+    mountedDate: m['mounted_date'] as String?,
+    dismountedOdometer: intOrNull(m['dismounted_odometer']),
+    dismountedDate: m['dismounted_date'] as String?,
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'vehicle_id': e.vehicleId.value,
+    'tire_id': e.tireId.value,
+    'position': e.position,
+    'mounted_odometer': e.mountedOdometer,
+    'mounted_date': e.mountedDate,
+    'dismounted_odometer': e.dismountedOdometer,
+    'dismounted_date': e.dismountedDate,
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },
