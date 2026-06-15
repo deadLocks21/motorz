@@ -22,6 +22,11 @@ class Tire {
   final String? purchaseDate; // YYYY-MM-DD
   final double? purchasePrice;
   final String? notes;
+
+  /// Date de mise au rebut (YYYY-MM-DD). Non-null ⇒ pneu **au rebut** : sorti de
+  /// l'inventaire actif et de la monte, mais conservé (avec ses montages) pour
+  /// l'historique. Null ⇒ en service / en stock.
+  final String? disposedDate;
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
@@ -40,8 +45,12 @@ class Tire {
     this.purchaseDate,
     this.purchasePrice,
     this.notes,
+    this.disposedDate,
     this.deletedAt,
   });
+
+  /// Pneu au rebut (parti à la benne) : hors inventaire actif, gardé pour l'historique.
+  bool get isDisposed => disposedDate != null;
 
   /// Libellé compact « marque modèle » (ou « Pneu » si inconnu).
   String get descriptor {

@@ -46,6 +46,8 @@ void main() {
     // Jeu été (6 PS4S : 2 AV + 2 AR déposés + 2 AR neufs) + galette + jeu hiver (4).
     expect(tires, hasLength(11));
     expect(mounts, hasLength(7));
+    // Les 2 arrière d'origine sont partis à la benne (au rebut), gardés en historique.
+    expect(tires.where((t) => t.isDisposed).length, 2);
 
     // « Elle a 12 567 km » = MAX(odometer) de toutes les saisies, montages inclus.
     expect(

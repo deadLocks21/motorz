@@ -145,9 +145,10 @@ class _MountTireSheetState extends ConsumerState<_MountTireSheet> {
         }
       }
     }
-    // Candidats au montage : tous les pneus sauf celui déjà ici.
-    final candidates =
-        tires.where((t) => occupant == null || t.id != occupant.tireId).toList();
+    // Candidats au montage : pneus non mis au rebut, sauf celui déjà ici.
+    final candidates = tires
+        .where((t) => !t.isDisposed && (occupant == null || t.id != occupant.tireId))
+        .toList();
     final selected =
         _selectedTireId != null && candidates.any((t) => t.id.value == _selectedTireId)
             ? _selectedTireId

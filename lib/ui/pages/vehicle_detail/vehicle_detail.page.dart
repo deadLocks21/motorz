@@ -583,16 +583,38 @@ class _TiresTab extends ConsumerWidget {
             const SizedBox(height: 20),
             SectionHeader('Inventaire',
                 onAdd: () => showTireSheet(context, ref, vehicleId: vehicleId), addLabel: 'Ajouter'),
-            if (fleet.inventory.isEmpty)
+            if (fleet.inventory.isEmpty && fleet.disposed.isEmpty)
               Text('Aucun pneu. Touche « Ajouter » pour en enregistrer un.',
                   style: TextStyle(color: colors.textMuted))
-            else
+            else ...[
               ...fleet.inventory.map((row) => _TireCard(
                     row: row,
                     colors: colors,
                     onTap: () =>
                         showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
                   )),
+              if (fleet.disposed.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4, left: 2),
+                  child: Text('AU REBUT',
+                      style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6)),
+                ),
+                ...fleet.disposed.map((row) => Opacity(
+                      opacity: 0.6,
+                      child: _TireCard(
+                        row: row,
+                        colors: colors,
+                        onTap: () =>
+                            showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
+                      ),
+                    )),
+              ],
+            ],
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(
@@ -918,7 +940,7 @@ class _TireCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _PositionBadge(position: row.position, colors: colors),
+          _PositionBadge(position: row.position, colors: colors, disposed: t.isDisposed),
           if (row.kmRolled != null) ...[
             const SizedBox(height: 4),
             Text(formatKm(row.kmRolled), style: TextStyle(color: colors.textMuted, fontSize: 12)),
@@ -934,17 +956,20 @@ class _TireCard extends StatelessWidget {
 /// Pastille de position d'un pneu : code de roue (accent) si monté, « Stock »
 /// (muet) sinon.
 class _PositionBadge extends StatelessWidget {
-  const _PositionBadge({required this.position, required this.colors});
+  const _PositionBadge({required this.position, required this.colors, this.disposed = false});
 
   final String? position;
   final AppColors colors;
+  final bool disposed;
 
   @override
   Widget build(BuildContext context) {
-    final mounted = position != null;
-    final label = position == null
-        ? 'Stock'
-        : (position == spareWheelPosition ? 'Secours' : position!);
+    final mounted = !disposed && position != null;
+    final label = disposed
+        ? 'Au rebut'
+        : (position == null
+            ? 'Stock'
+            : (position == spareWheelPosition ? 'Secours' : position!));
     final c = mounted ? colors.accent : colors.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/tire.dart';
 import 'package:motorz/core/domain/model/tire_mount.dart';
@@ -10,6 +11,14 @@ import 'package:motorz/ui/theme/app_colors.dart';
 import 'package:motorz/ui/utils/format.dart';
 
 double? _num(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
+
+/// `YYYY-MM-DD` → `dd/MM/yyyy` (repli sur la valeur brute si non parsable).
+String _fmtYmd(String ymd) {
+  final d = DateTime.tryParse(ymd);
+  return d != null ? formatDate(d) : ymd;
+}
+
+String _todayYmd() => DateTime.now().toIso8601String().substring(0, 10);
 
 /// Feuille de création/édition d'un pneu de l'inventaire. Passe [existing] pour
 /// l'édition (même id). La suppression efface aussi le journal de montages du
@@ -50,6 +59,9 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
   TireSeason? _season;
   TireCondition _condition = TireCondition.neuf;
   DateTime? _purchaseDate;
+
+  /// Date de mise au rebut (YYYY-MM-DD) ; null = en service. Préservée au save.
+  String? _disposedDate;
   bool _saving = false;
 
   @override
@@ -67,6 +79,7 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
       _season = e.season;
       _condition = e.condition;
       _purchaseDate = e.purchaseDate != null ? DateTime.tryParse(e.purchaseDate!) : null;
+      _disposedDate = e.disposedDate;
     }
   }
 
@@ -99,10 +112,11 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
     if (picked != null) setState(() => _purchaseDate = picked);
   }
 
-  Future<void> _save() async {
-    setState(() => _saving = true);
+  /// Construit le pneu depuis les champs du formulaire, en conservant l'identité
+  /// et le statut au rebut courant ([_disposedDate]).
+  Tire _buildTire() {
     final base = widget.existing;
-    final tire = Tire(
+    return Tire(
       id: base?.id ?? UuidValue.generate(),
       vehicleId: base?.vehicleId ?? UuidValue.parse(widget.vehicleId),
       createdByUserId: base?.createdByUserId,
@@ -116,9 +130,63 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
       purchaseDate: _purchaseDate?.toIso8601String().substring(0, 10),
       purchasePrice: _num(_price.text),
       notes: _emptyToNull(_notes),
+      disposedDate: _disposedDate,
       updatedAt: DateTime.now().toUtc(),
     );
-    await ref.read(tireRepositoryProvider).save(tire);
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    await ref.read(tireRepositoryProvider).save(_buildTire());
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Met le pneu au rebut : le démonte d'abord s'il roule (fige ses km au km
+  /// courant), puis pose la date de mise au rebut. Les montages sont conservés
+  /// (pas de tombstone) → le pneu reste dans l'historique.
+  Future<void> _retire() async {
+    final ex = widget.existing;
+    if (ex == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Mettre ce pneu au rebut ?'),
+        content: const Text(
+            'Il quitte l\'inventaire actif (et la monte) mais reste dans l\'historique. Réversible.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Au rebut')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _saving = true);
+    // Démonte s'il est encore monté, pour clore son dernier intervalle.
+    final mountRepo = ref.read(tireMountRepositoryProvider);
+    final mounts = await mountRepo.listForVehicle(widget.vehicleId);
+    final open = TireService.currentMountFor(ex.id.value, mounts);
+    if (open != null) {
+      final odo =
+          await ref.read(currentOdometerProvider(widget.vehicleId).future) ?? open.mountedOdometer;
+      for (final w in TireService.planDismount(
+        position: open.position,
+        odometer: odo,
+        date: _todayYmd(),
+        mounts: mounts,
+        now: DateTime.now().toUtc(),
+      )) {
+        await mountRepo.save(w);
+      }
+    }
+    _disposedDate = _todayYmd();
+    await ref.read(tireRepositoryProvider).save(_buildTire());
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _reinstate() async {
+    setState(() => _saving = true);
+    _disposedDate = null;
+    await ref.read(tireRepositoryProvider).save(_buildTire());
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -249,6 +317,12 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
           children: [
             Text(isEditing ? 'Modifier le pneu' : 'Nouveau pneu',
                 style: Theme.of(context).textTheme.titleLarge),
+            if (_disposedDate != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Au rebut le ${_fmtYmd(_disposedDate!)}',
+                    style: TextStyle(color: context.appColors.textMuted)),
+              ),
             const SizedBox(height: 16),
             _suggestField(
               key: const Key('tireBrandField'),
@@ -379,6 +453,21 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
             ),
             if (isEditing) ...[
               const SizedBox(height: 8),
+              if (_disposedDate == null)
+                OutlinedButton.icon(
+                  key: const Key('disposeTireButton'),
+                  onPressed: _saving ? null : _retire,
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: const Text('Mettre au rebut'),
+                )
+              else
+                OutlinedButton.icon(
+                  key: const Key('reinstateTireButton'),
+                  onPressed: _saving ? null : _reinstate,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Remettre en service'),
+                ),
+              const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: _delete,
                 icon: const Icon(Icons.delete_outline),

@@ -129,4 +129,53 @@ void main() {
     // L'inventaire reste sur l'onglet Pneus, pas ici.
     expect(find.text('Inventaire'), findsNothing);
   });
+
+  testWidgets('mettre au rebut : sort de la monte (démontage auto) mais garde le pneu', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final (store, vehicleId) = await seed();
+    await pumpDetail(tester, store, vehicleId);
+
+    await tester.tap(find.text('Pneus'));
+    await tester.pumpAndSettle();
+
+    // Ajoute un pneu puis le monte en AVG à 10 000 km.
+    await tester.tap(find.widgetWithText(TextButton, 'Ajouter'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('tireBrandField')), 'Michelin');
+    final saveTire = find.byKey(const Key('saveTireButton'));
+    await tester.ensureVisible(saveTire);
+    await tester.pumpAndSettle();
+    await tester.tap(saveTire);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AVG'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('mountOdometerField')), '10000');
+    final mountBtn = find.byKey(const Key('mountConfirmButton'));
+    await tester.ensureVisible(mountBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(mountBtn);
+    await tester.pumpAndSettle();
+    expect((await store.query('tire_mounts')), hasLength(1));
+
+    // Ouvre la carte d'inventaire (2ᵉ occurrence : la 1ʳᵉ est la cellule de monte).
+    await tester.tap(find.text('Michelin').last);
+    await tester.pumpAndSettle();
+    final disposeBtn = find.byKey(const Key('disposeTireButton'));
+    await tester.ensureVisible(disposeBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(disposeBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Au rebut')); // confirme
+    await tester.pumpAndSettle();
+
+    // L'intervalle est fermé (démontage auto au km courant), le pneu conservé,
+    // et il passe en « Au rebut ».
+    final mounts = await store.query('tire_mounts');
+    expect(mounts, hasLength(1));
+    expect(mounts.first['dismounted_odometer'], 10000);
+    expect((await store.query('tires')), hasLength(1)); // pas supprimé
+    expect(find.text('Au rebut'), findsOneWidget); // pastille de la section rebut
+  });
 }
