@@ -14,6 +14,7 @@ import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dar
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_tire_sheet.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/tire_history.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/mount_tire_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/tire_inventory_sheet.widget.dart';
@@ -592,6 +593,13 @@ class _TiresTab extends ConsumerWidget {
                     onTap: () =>
                         showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
                   )),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => TireHistoryPage(vehicleId: vehicleId, wheelCount: wheelCount))),
+              icon: const Icon(Icons.history, size: 18),
+              label: const Text('Historique des changements'),
+            ),
           ],
         );
       },

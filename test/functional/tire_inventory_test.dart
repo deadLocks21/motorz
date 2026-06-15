@@ -103,6 +103,15 @@ void main() {
     expect((await store.query('tire_mounts')), hasLength(1));
     expect(find.text('Stock'), findsNothing);
     expect(find.text('AVG'), findsWidgets); // cellule + pastille d'inventaire
+
+    // L'historique des changements s'ouvre et montre le montage.
+    final histBtn = find.widgetWithText(OutlinedButton, 'Historique des changements');
+    await tester.ensureVisible(histBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(histBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('Historique des pneus'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_upward), findsWidgets); // au moins un « Monté »
   });
 
   testWidgets('l\'onglet Pressions porte les cibles & relevés (séparé de Pneus)', (tester) async {

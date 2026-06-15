@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motorz/core/application/services/tire.service.dart';
+import 'package:motorz/core/domain/model/tire.dart';
 import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 
@@ -12,9 +13,12 @@ void main() {
   // IDs fixes (UUID v4 valides).
   const t1 = '11111111-1111-4111-8111-111111111111';
   const t2 = '22222222-2222-4222-8222-222222222222';
+  const t3 = '33333333-3333-4333-8333-333333333333';
   const m1 = 'aaaaaaaa-1111-4111-8111-111111111111';
   const m2 = 'bbbbbbbb-2222-4222-8222-222222222222';
+  const m3 = 'cccccccc-3333-4333-8333-333333333333';
 
+  Tire tire(String id) => Tire(id: UuidValue.parse(id), vehicleId: vehicleId, updatedAt: now);
   TireMount mount(
     String id,
     String tireId,
@@ -177,6 +181,34 @@ void main() {
         TireService.planDismount(position: 'ARG', odometer: 5000, mounts: const [], now: now),
         isEmpty,
       );
+    });
+  });
+
+  group('vehicleChanges', () {
+    test('regroupe par (km) et trie du plus récent ; montés + déposés', () {
+      final tires = [tire(t1), tire(t2), tire(t3)];
+      final mounts = [
+        mount(m1, t1, 'AVG', 50), // monté à la livraison, encore en place
+        mount(m2, t2, 'ARG', 50, to: 10400), // arrière d'origine, déposé à 10 400
+        mount(m3, t3, 'ARG', 10400), // arrière neuf monté à 10 400
+      ];
+      final changes = TireService.vehicleChanges(tires, mounts);
+
+      expect(changes, hasLength(2));
+      // Plus récent d'abord : le remplacement à 10 400 km.
+      expect(changes[0].odometer, 10400);
+      expect(changes[0].mounted.map((e) => e.tire.id.value), [t3]);
+      expect(changes[0].mounted.single.position, 'ARG');
+      expect(changes[0].dismounted.map((e) => e.tire.id.value), [t2]);
+      // Puis la pose initiale (50 km) : 2 montés, rien de déposé.
+      expect(changes[1].odometer, 50);
+      expect(changes[1].mounted.map((e) => e.position), containsAll(['AVG', 'ARG']));
+      expect(changes[1].dismounted, isEmpty);
+    });
+
+    test('ignore les intervalles supprimés', () {
+      final mounts = [mount(m1, t1, 'AVG', 50, deleted: true)];
+      expect(TireService.vehicleChanges([tire(t1)], mounts), isEmpty);
     });
   });
 }
