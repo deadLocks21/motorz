@@ -6,6 +6,18 @@ import 'package:motorz/core/domain/model/uuid_value.dart';
 /// Pneu monté à une position, avec son intervalle ouvert et ses km roulés dérivés.
 typedef MountedTire = ({Tire tire, TireMount mount, int? kmRolled});
 
+/// Un pneu impliqué dans un changement, à une position donnée.
+typedef TireChangeEntry = ({Tire tire, String position});
+
+/// Un « changement » : à un odomètre/date, des pneus montés et/ou déposés (un
+/// remplacement de paire ou un swap saisonnier de 4 roues = un seul changement).
+typedef TireChange = ({
+  int odometer,
+  String? date,
+  List<TireChangeEntry> mounted,
+  List<TireChangeEntry> dismounted,
+});
+
 /// Dérivations du parc de pneus — faites **localement** (offline-first) à partir
 /// de l'inventaire ([Tire]) et du journal de montages ([TireMount]). La position
 /// courante et les km roulés ne sont jamais stockés : ils se calculent ici.
@@ -70,6 +82,48 @@ abstract final class TireService {
       );
     }
     return result;
+  }
+
+  /// Historique des changements du véhicule, dérivé du journal de montages :
+  /// chaque montage produit un événement « monté », chaque démontage un « déposé »,
+  /// regroupés par (odomètre, date) — un swap de plusieurs roues au même km forme
+  /// donc un seul changement. Trié du plus récent (km décroissant).
+  static List<TireChange> vehicleChanges(List<Tire> tires, List<TireMount> mounts) {
+    final tireById = {for (final t in tires) t.id.value: t};
+    final mountedBy = <String, List<TireChangeEntry>>{};
+    final dismountedBy = <String, List<TireChangeEntry>>{};
+    final meta = <String, ({int odometer, String? date})>{};
+    String keyOf(int odo, String? date) => '$odo|${date ?? ''}';
+    for (final m in mounts) {
+      if (m.deletedAt != null) continue;
+      final tire = tireById[m.tireId.value];
+      if (tire == null) continue;
+      final entry = (tire: tire, position: m.position);
+      final mk = keyOf(m.mountedOdometer, m.mountedDate);
+      meta[mk] = (odometer: m.mountedOdometer, date: m.mountedDate);
+      (mountedBy[mk] ??= []).add(entry);
+      final dOdo = m.dismountedOdometer;
+      if (dOdo != null) {
+        final dk = keyOf(dOdo, m.dismountedDate);
+        meta[dk] = (odometer: dOdo, date: m.dismountedDate);
+        (dismountedBy[dk] ??= []).add(entry);
+      }
+    }
+    final keys = meta.keys.toList()
+      ..sort((a, b) {
+        final byOdo = meta[b]!.odometer.compareTo(meta[a]!.odometer); // décroissant
+        if (byOdo != 0) return byOdo;
+        return (meta[b]!.date ?? '').compareTo(meta[a]!.date ?? '');
+      });
+    return [
+      for (final k in keys)
+        (
+          odometer: meta[k]!.odometer,
+          date: meta[k]!.date,
+          mounted: mountedBy[k] ?? const [],
+          dismounted: dismountedBy[k] ?? const [],
+        ),
+    ];
   }
 
   /// Écritures à persister pour **monter** [tireId] en [position] à l'odomètre
