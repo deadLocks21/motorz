@@ -225,6 +225,7 @@ class DemoSeed {
       TireSeason? season,
       String? purchaseDate,
       double? price,
+      String? disposedDate,
     }) =>
         Tire(
           id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000a$suffix'),
@@ -237,6 +238,7 @@ class DemoSeed {
           season: season,
           purchaseDate: purchaseDate,
           purchasePrice: price,
+          disposedDate: disposedDate,
           updatedAt: _seedAt,
         );
 
@@ -261,7 +263,8 @@ class DemoSeed {
           season: TireSeason.ete,
           purchaseDate: '2024-03-15',
           price: 295),
-      // Arrière d'origine, déposés à 10 400 km (en stock désormais).
+      // Arrière d'origine, déposés à 10 400 km puis partis à la benne (au rebut) :
+      // conservés pour l'historique, hors inventaire actif.
       t('0003',
           brand: ps4s.brand,
           model: ps4s.model,
@@ -270,7 +273,8 @@ class DemoSeed {
           rimSpec: '9J×19 ET45',
           season: TireSeason.ete,
           purchaseDate: '2024-03-15',
-          price: 295),
+          price: 295,
+          disposedDate: '2025-11-05'),
       t('0004',
           brand: ps4s.brand,
           model: ps4s.model,
@@ -279,7 +283,8 @@ class DemoSeed {
           rimSpec: '9J×19 ET45',
           season: TireSeason.ete,
           purchaseDate: '2024-03-15',
-          price: 295),
+          price: 295,
+          disposedDate: '2025-11-05'),
       // Arrière neufs (remplacement 2025-11).
       t('0005',
           brand: ps4s.brand,

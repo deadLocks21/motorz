@@ -263,7 +263,8 @@ Future<List<TireMount>> tireMounts(Ref ref, String vehicleId) async {
 typedef TireInventoryRow = ({Tire tire, String? position, int? kmRolled});
 typedef TireFleet = ({
   Map<String, MountedTire> byPosition,
-  List<TireInventoryRow> inventory,
+  List<TireInventoryRow> inventory, // en service / en stock
+  List<TireInventoryRow> disposed, // au rebut (gardés pour l'historique)
   int? currentOdometer,
 });
 
@@ -284,7 +285,12 @@ Future<TireFleet> tireFleet(Ref ref, String vehicleId) async {
         kmRolled: TireService.kmRolled(t.id.value, mounts, odo),
       ),
   ]..sort(_compareInventoryRows);
-  return (byPosition: byPosition, inventory: rows, currentOdometer: odo);
+  return (
+    byPosition: byPosition,
+    inventory: [for (final r in rows) if (!r.tire.isDisposed) r],
+    disposed: [for (final r in rows) if (r.tire.isDisposed) r],
+    currentOdometer: odo,
+  );
 }
 
 const _positionOrder = ['AVG', 'AVD', 'ARG', 'ARD', 'AV', 'AR', 'SEC'];
