@@ -57,8 +57,36 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('ajoute un pneu à l\'inventaire puis le monte en AVG', (tester) async {
-    // Feuilles longues : surface haute pour garder boutons et grille à l'écran.
+  // Ajoute un pneu Michelin via le bouton « Ajouter » de l'onglet Pneus.
+  Future<void> addTire(WidgetTester tester, {String model = '', String size = ''}) async {
+    await tester.tap(find.widgetWithText(TextButton, 'Ajouter'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('tireBrandField')), 'Michelin');
+    if (model.isNotEmpty) await tester.enterText(find.byKey(const Key('tireModelField')), model);
+    if (size.isNotEmpty) await tester.enterText(find.byKey(const Key('tireSizeField')), size);
+    final saveTire = find.byKey(const Key('saveTireButton'));
+    await tester.ensureVisible(saveTire);
+    await tester.pumpAndSettle();
+    await tester.tap(saveTire);
+    await tester.pumpAndSettle();
+  }
+
+  // Monte le pneu (unique candidat) en AVG via la page de position, à [odo] km.
+  Future<void> mountInAvg(WidgetTester tester, String odo) async {
+    await tester.tap(find.text('AVG'));
+    await tester.pumpAndSettle();
+    expect(find.text('Avant gauche'), findsOneWidget); // page de position
+    await tester.tap(find.byKey(const Key('positionActionButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('mountOdometerField')), odo);
+    final mountBtn = find.byKey(const Key('mountConfirmButton'));
+    await tester.ensureVisible(mountBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(mountBtn);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('pneu : carte → page détail ; roue → page position → montage', (tester) async {
     await tester.binding.setSurfaceSize(const Size(900, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final (store, vehicleId) = await seed();
@@ -67,55 +95,39 @@ void main() {
     await tester.tap(find.text('Pneus'));
     await tester.pumpAndSettle();
     expect(find.text('Aucun pneu. Touche « Ajouter » pour en enregistrer un.'), findsOneWidget);
-    expect(find.text('AVG'), findsOneWidget); // grille de monte affichée
+    expect(find.text('AVG'), findsOneWidget); // grille de monte
 
-    // Ajoute un pneu via le bouton de section (pas le FAB, réservé aux pressions).
-    await tester.tap(find.widgetWithText(TextButton, 'Ajouter'));
-    await tester.pumpAndSettle();
-    expect(find.text('Nouveau pneu'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('tireBrandField')), 'Michelin');
-    await tester.enterText(find.byKey(const Key('tireModelField')), 'Pilot Sport 4S');
-    await tester.enterText(find.byKey(const Key('tireSizeField')), '255/40 R19');
-    final saveTire = find.byKey(const Key('saveTireButton'));
-    await tester.ensureVisible(saveTire);
-    await tester.pumpAndSettle();
-    await tester.tap(saveTire);
-    await tester.pumpAndSettle();
-
+    await addTire(tester, model: 'Pilot Sport 4S', size: '255/40 R19');
     expect((await store.query('tires')), hasLength(1));
-    expect(find.text('Michelin Pilot Sport 4S'), findsWidgets); // carte d'inventaire
-    expect(find.text('Stock'), findsOneWidget); // pas encore monté
+    expect(find.text('Stock'), findsOneWidget);
 
-    // Monte le pneu en avant gauche.
-    await tester.tap(find.text('AVG'));
+    // Tap sur la carte → page détail du pneu (read-first).
+    await tester.tap(find.text('Michelin Pilot Sport 4S'));
     await tester.pumpAndSettle();
-    expect(find.text('Position Avant gauche'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('mountOdometerField')), '10000');
-    final mountBtn = find.byKey(const Key('mountConfirmButton'));
-    await tester.ensureVisible(mountBtn);
-    await tester.pumpAndSettle();
-    await tester.tap(mountBtn);
+    expect(find.text('En stock'), findsOneWidget); // statut sur la page détail
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Un intervalle ouvert créé ; la pastille passe de « Stock » à « AVG ».
+    // Tap sur la roue → page position → montage à 10 000 km.
+    await mountInAvg(tester, '10000');
     expect((await store.query('tire_mounts')), hasLength(1));
-    expect(find.text('Stock'), findsNothing);
-    expect(find.text('AVG'), findsWidgets); // cellule + pastille d'inventaire
+    // De retour sur la page position : le pneu est monté.
+    expect(find.text('Michelin Pilot Sport 4S'), findsWidgets);
+    expect(find.widgetWithText(FilledButton, 'Changer / démonter'), findsOneWidget);
 
-    // L'historique des changements s'ouvre et montre le montage.
+    // Historique des changements depuis l'onglet Pneus.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     final histBtn = find.widgetWithText(OutlinedButton, 'Historique des changements');
     await tester.ensureVisible(histBtn);
     await tester.pumpAndSettle();
     await tester.tap(histBtn);
     await tester.pumpAndSettle();
     expect(find.text('Historique des pneus'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_upward), findsWidgets); // au moins un « Monté »
+    expect(find.byIcon(Icons.arrow_upward), findsWidgets); // un « Monté »
   });
 
   testWidgets('l\'onglet Pressions porte les cibles & relevés (séparé de Pneus)', (tester) async {
-    // Surface large : les 7 onglets tiennent, « Pressions » est visible.
     await tester.binding.setSurfaceSize(const Size(1400, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final (store, vehicleId) = await seed();
@@ -123,14 +135,12 @@ void main() {
 
     await tester.tap(find.text('Pressions'));
     await tester.pumpAndSettle();
-    // Contenu pressions (déplacé hors de l'onglet Pneus).
     expect(find.text('Relevés'), findsOneWidget);
     expect(find.text('Définir une pression cible'), findsOneWidget);
-    // L'inventaire reste sur l'onglet Pneus, pas ici.
-    expect(find.text('Inventaire'), findsNothing);
+    expect(find.text('Inventaire'), findsNothing); // l'inventaire reste sur Pneus
   });
 
-  testWidgets('mettre au rebut : sort de la monte (démontage auto) mais garde le pneu', (tester) async {
+  testWidgets('mettre au rebut (depuis la page détail) : démontage auto, pneu gardé', (tester) async {
     await tester.binding.setSurfaceSize(const Size(900, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final (store, vehicleId) = await seed();
@@ -138,44 +148,31 @@ void main() {
 
     await tester.tap(find.text('Pneus'));
     await tester.pumpAndSettle();
-
-    // Ajoute un pneu puis le monte en AVG à 10 000 km.
-    await tester.tap(find.widgetWithText(TextButton, 'Ajouter'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('tireBrandField')), 'Michelin');
-    final saveTire = find.byKey(const Key('saveTireButton'));
-    await tester.ensureVisible(saveTire);
-    await tester.pumpAndSettle();
-    await tester.tap(saveTire);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('AVG'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('mountOdometerField')), '10000');
-    final mountBtn = find.byKey(const Key('mountConfirmButton'));
-    await tester.ensureVisible(mountBtn);
-    await tester.pumpAndSettle();
-    await tester.tap(mountBtn);
-    await tester.pumpAndSettle();
+    await addTire(tester);
+    await mountInAvg(tester, '10000');
     expect((await store.query('tire_mounts')), hasLength(1));
 
-    // Ouvre la carte d'inventaire (2ᵉ occurrence : la 1ʳᵉ est la cellule de monte).
-    await tester.tap(find.text('Michelin').last);
+    // Depuis la fiche de roue, le pneu monté donne accès à sa fiche (≠ tuiles d'historique).
+    await tester.tap(find.text('Michelin').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Monté · Avant gauche'), findsOneWidget);
+
+    // ✏️ → feuille → Mettre au rebut → confirme.
+    await tester.tap(find.byKey(const Key('tireEditButton')));
     await tester.pumpAndSettle();
     final disposeBtn = find.byKey(const Key('disposeTireButton'));
     await tester.ensureVisible(disposeBtn);
     await tester.pumpAndSettle();
     await tester.tap(disposeBtn);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Au rebut')); // confirme
+    await tester.tap(find.widgetWithText(FilledButton, 'Au rebut'));
     await tester.pumpAndSettle();
 
-    // L'intervalle est fermé (démontage auto au km courant), le pneu conservé,
-    // et il passe en « Au rebut ».
+    // Intervalle fermé (démontage auto au km courant), pneu conservé, statut au rebut.
     final mounts = await store.query('tire_mounts');
     expect(mounts, hasLength(1));
     expect(mounts.first['dismounted_odometer'], 10000);
     expect((await store.query('tires')), hasLength(1)); // pas supprimé
-    expect(find.text('Au rebut'), findsWidgets); // en-tête de section + pastille
+    expect(find.textContaining('Au rebut'), findsWidgets); // statut sur la page détail
   });
 }

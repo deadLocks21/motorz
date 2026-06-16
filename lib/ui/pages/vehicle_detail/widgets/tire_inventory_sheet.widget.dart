@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/tire.dart';
-import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
@@ -259,49 +258,6 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
     );
   }
 
-  /// Historique de montage du pneu en cours d'édition (lecture seule) : où il a
-  /// été monté et sur combien de km.
-  Widget _tireHistory() {
-    final tireId = widget.existing!.id.value;
-    final mounts = (ref.watch(tireMountsProvider(widget.vehicleId)).value ?? const <TireMount>[])
-        .where((m) => m.deletedAt == null && m.tireId.value == tireId)
-        .toList()
-      ..sort((a, b) => b.mountedOdometer.compareTo(a.mountedOdometer));
-    if (mounts.isEmpty) return const SizedBox.shrink();
-    final currentOdo = ref.watch(currentOdometerProvider(widget.vehicleId)).value;
-    final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text('HISTORIQUE',
-            style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6)),
-        const SizedBox(height: 4),
-        for (final m in mounts)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Text(_intervalLabel(m, currentOdo),
-                style: TextStyle(color: colors.textMuted, fontSize: 13)),
-          ),
-      ],
-    );
-  }
-
-  String _intervalLabel(TireMount m, int? currentOdo) {
-    final where = m.position == spareWheelPosition ? 'Secours' : positionLabel(m.position);
-    final end = m.dismountedOdometer;
-    final endLabel = end != null ? formatKm(end) : 'en cours';
-    final spanEnd = end ?? currentOdo;
-    final span =
-        (m.position != spareWheelPosition && spanEnd != null) ? spanEnd - m.mountedOdometer : null;
-    final suffix = (span != null && span > 0) ? '  ·  ${formatKm(span)}' : '';
-    return '$where : ${formatKm(m.mountedOdometer)} → $endLabel$suffix';
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -444,7 +400,6 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Notes (optionnel)'),
             ),
-            if (isEditing) _tireHistory(),
             const SizedBox(height: 20),
             FilledButton(
               key: const Key('saveTireButton'),
