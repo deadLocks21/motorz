@@ -176,6 +176,6 @@ void main() {
     expect(mounts, hasLength(1));
     expect(mounts.first['dismounted_odometer'], 10000);
     expect((await store.query('tires')), hasLength(1)); // pas supprimé
-    expect(find.text('Au rebut'), findsOneWidget); // pastille de la section rebut
+    expect(find.text('Au rebut'), findsWidgets); // en-tête de section + pastille
   });
 }

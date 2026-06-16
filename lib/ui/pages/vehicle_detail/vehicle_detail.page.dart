@@ -564,15 +564,7 @@ class _TiresTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8, left: 2),
-              child: Text('MONTE ACTUELLE',
-                  style: TextStyle(
-                      color: colors.textMuted,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6)),
-            ),
+            const SectionHeader('Monte actuelle'),
             _WheelMap(
               wheelCount: wheelCount,
               byPosition: fleet.byPosition,
@@ -595,15 +587,7 @@ class _TiresTab extends ConsumerWidget {
                   )),
               if (fleet.disposed.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4, left: 2),
-                  child: Text('AU REBUT',
-                      style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6)),
-                ),
+                const SectionHeader('Au rebut'),
                 ...fleet.disposed.map((row) => Opacity(
                       opacity: 0.6,
                       child: _TireCard(
@@ -667,15 +651,7 @@ class _PressuresTab extends ConsumerWidget {
                 label: const Text('Définir une pression cible'),
               )
             else ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8, left: 2),
-                child: Text('PRESSIONS CIBLES',
-                    style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6)),
-              ),
+              const SectionHeader('Pressions cibles'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -683,8 +659,7 @@ class _PressuresTab extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 16),
-            Text('Relevés', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
+            const SectionHeader('Relevés'),
             if (entries.isEmpty)
               Text('Aucun relevé. Touche + pour en ajouter.', style: TextStyle(color: colors.textMuted))
             else
