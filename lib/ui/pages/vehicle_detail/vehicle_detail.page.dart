@@ -14,9 +14,10 @@ import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dar
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_tire_sheet.widget.dart';
+import 'package:motorz/ui/pages/vehicle_detail/position_detail.page.dart';
+import 'package:motorz/ui/pages/vehicle_detail/tire_detail.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/tire_history.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
-import 'package:motorz/ui/pages/vehicle_detail/widgets/mount_tire_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/tire_inventory_sheet.widget.dart';
 import 'package:motorz/ui/widgets/section_header.widget.dart';
 import 'package:motorz/ui/pages/finances/finances.page.dart';
@@ -569,8 +570,8 @@ class _TiresTab extends ConsumerWidget {
               wheelCount: wheelCount,
               byPosition: fleet.byPosition,
               colors: colors,
-              onTap: (position) => showMountTireSheet(context, ref,
-                  vehicleId: vehicleId, position: position, lastOdometer: fleet.currentOdometer),
+              onTap: (position) => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => PositionDetailPage(vehicleId: vehicleId, position: position))),
             ),
             const SizedBox(height: 20),
             SectionHeader('Inventaire',
@@ -583,7 +584,8 @@ class _TiresTab extends ConsumerWidget {
                     row: row,
                     colors: colors,
                     onTap: () =>
-                        showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
+                        Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => TireDetailPage(tire: row.tire, vehicleId: vehicleId))),
                   )),
               if (fleet.disposed.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -594,7 +596,8 @@ class _TiresTab extends ConsumerWidget {
                         row: row,
                         colors: colors,
                         onTap: () =>
-                            showTireSheet(context, ref, vehicleId: vehicleId, existing: row.tire),
+                            Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => TireDetailPage(tire: row.tire, vehicleId: vehicleId))),
                       ),
                     )),
               ],
@@ -922,6 +925,7 @@ class _TireCard extends StatelessWidget {
           ],
         ],
       ),
+      showChevron: true,
       colors: colors,
       onTap: onTap,
     );
