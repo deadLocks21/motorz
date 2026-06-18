@@ -1,0 +1,13 @@
+# Package Dart de l'updater desktop (installateur / launcher / auto-updater).
+
+# Cache de résolution Pub.
+.dart_tool/
+
+# Binaires compilés : produits par le CI (`dart compile exe`) et attachés à la
+# GitHub Release — jamais commités.
+motorz-updater
+motorz-updater.exe
+motorz-updater-windows.exe
+motorz-updater-linux
+
+# NB : pubspec.lock EST commité (binaire reproductible) — ne pas l'ignorer.

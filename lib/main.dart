@@ -14,8 +14,18 @@ import 'package:motorz/infrastructure/sync/pending_queue.dart';
 import 'package:motorz/infrastructure/sync/rejected_op_store.dart';
 import 'package:motorz/ui/router/app_router.dart';
 import 'package:motorz/ui/theme/app_theme_data.dart';
+import 'package:motorz/updating_splash.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // Mode « fenêtre de mise à jour » : l'updater desktop (tool/updater) lance
+  // `motorz --updating …` pour afficher une petite fenêtre de progression
+  // pendant qu'il télécharge/installe la nouvelle version. On NE démarre PAS
+  // l'app complète (ni la base sqflite) dans ce cas.
+  if (args.contains('--updating')) {
+    runUpdatingSplash(args);
+    return;
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
 
   // Sur mobile/desktop, ouvre la base sqflite et surcharge le store/file
