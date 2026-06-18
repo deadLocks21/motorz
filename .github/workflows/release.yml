@@ -379,6 +379,11 @@ jobs:
 
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      # pdfx télécharge/compile pdfium via un CMake imbriqué dont le template
+      # déclare cmake_minimum_required(VERSION 2.8.12). CMake 4 a supprimé la
+      # compat < 3.5 ; l'env var (héritée par l'invocation cmake imbriquée)
+      # relâche ce minimum. Cf. pdfx/windows/DownloadProject.CMakeLists.cmake.in.
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
     steps:
       - uses: actions/checkout@v4
@@ -443,6 +448,10 @@ jobs:
 
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      # Filet CMake 4 : certains plugins desktop déclarent encore un
+      # cmake_minimum_required < 3.5 (supprimé par CMake 4). L'env var relâche
+      # ce minimum pour toutes les invocations cmake (cf. build-windows / pdfx).
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
     steps:
       - uses: actions/checkout@v4
