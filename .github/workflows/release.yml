@@ -8,17 +8,23 @@
 #   1) prepare         Calcule la version (depuis le tag ou pubspec.yaml).
 #   2) build-android   AAB + APK universel signés (artifacts, pas encore publiés).
 #      build-macos     .pkg signé Mac App Store (artifact, pas encore publié).
-#   3) build-gate      Sentinelle : vérifie que les builds sont verts.
+#      build-windows   .zip autonome du dossier Release (artifact).
+#      build-linux     AppImage x86_64 (artifact).
+#      build-updater   CLI installateur/auto-updater desktop (Win + Linux).
+#   3) build-gate      Sentinelle : vérifie que les builds d'app sont verts.
 #   4) publish-android Upload sur le Play Store, piste "internal".
 #      publish-macos   Upload sur TestFlight (les testeurs internes du groupe
 #                      "Motorz Internal" reçoivent le build automatiquement).
-#   5) release         Crée la GitHub Release avec l'AAB + l'APK + le .pkg attachés.
+#   5) release         Crée la GitHub Release avec l'AAB + l'APK + le .pkg +
+#                      le .zip Windows + l'AppImage + les 2 binaires updater.
 #
-# AUTRES PLATEFORMES (iOS/App Store, Windows/Linux, Web) : hors pipeline pour
-# l'instant (cf. BRIEF §12 et §13, étape 14 « Élargissement des cibles »).
-# Le workflow de songbook-app (`../songbook-app/.github/workflows/release.yml`)
-# contient les jobs build/publish prêts à copier — builds parallèles + gate
-# strict + release multi-assets — quand ces cibles seront activées.
+# CANAL DESKTOP (Windows/Linux) : pas de store → distribution + auto-update via
+# les GitHub Releases. L'utilisateur télécharge l'updater une fois (tool/updater),
+# qui met ensuite à jour l'app ET lui-même (cf. tool/updater/README.md). macOS
+# garde son canal store (Mac App Store / TestFlight). build-windows/linux sont
+# dans le gate (atomique) ; build-updater conditionne la release, pas les stores.
+# AUTRES CIBLES (iOS/App Store, Web) : hors pipeline pour l'instant
+# (cf. BRIEF §12 et §13, étape 14 « Élargissement des cibles »).
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
 #   ANDROID_KEYSTORE_BASE64        keystore upload (.jks) encodé base64
@@ -362,12 +368,229 @@ jobs:
           if-no-files-found: error
 
   # ═══════════════════════════════════════════════════════════════════════
+  # BUILD WINDOWS — Compilation desktop + zip autonome (pas de publish store)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-windows:
+    name: Build Windows (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - run: flutter pub get
+
+      - name: Build Windows release
+        shell: pwsh
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build windows --release `
+            --build-name="$env:VERSION" `
+            --build-number="${{ github.run_number }}" `
+            --dart-define=SIGNOZ_INGEST_URL="$env:SIGNOZ_INGEST_URL" `
+            --dart-define=SIGNOZ_INGESTION_KEY="$env:SIGNOZ_INGESTION_KEY" `
+            --dart-define=SIGNOZ_ENV="$env:SIGNOZ_ENV" `
+            --dart-define=APP_VERSION="$env:VERSION+${{ github.run_number }}"
+
+      - name: Zip Windows build output
+        # Le .exe dépend des DLL Flutter et du dossier `data/` côte à côte
+        # → on zippe tout le dossier Release pour une archive autonome.
+        shell: pwsh
+        run: |
+          $zipName = "motorz-windows-$env:VERSION-${{ github.run_number }}.zip"
+          $sourceDir = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $sourceDir)) {
+            Write-Error "Build output directory not found: $sourceDir"
+            exit 1
+          }
+          Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipName
+          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motorz-windows
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # BUILD LINUX — Compilation desktop + AppImage (pas de publish store)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-linux:
+    name: Build Linux (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    # ubuntu-22.04 (glibc 2.35) plutôt que ubuntu-latest (24.04 / glibc 2.39)
+    # pour rester compatible avec des distros utilisateur un peu plus anciennes.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flutter Linux desktop build dependencies
+        # Dépendances GTK standard de Flutter desktop. Motorz n'utilise pas
+        # media_kit → pas de libasound2-dev / libmpv-dev (contrairement à kidflix).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            libgtk-3-dev \
+            clang \
+            cmake \
+            pkg-config \
+            liblzma-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop support
+        run: flutter config --enable-linux-desktop
+
+      - run: flutter pub get
+
+      - name: Build Linux release
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build linux --release \
+            --build-name="$VERSION" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV" \
+            --dart-define=APP_VERSION="$VERSION+${{ github.run_number }}"
+
+      - name: Assemble AppDir
+        run: |
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          APPDIR="AppDir"
+          mkdir -p "$APPDIR/usr/bin"
+          cp -r "$BUNDLE_DIR"/* "$APPDIR/usr/bin/"
+
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export LD_LIBRARY_PATH="$HERE/usr/bin/lib:${LD_LIBRARY_PATH}"
+          cd "$HERE/usr/bin" && exec ./motorz "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+          cat > "$APPDIR/motorz.desktop" <<EOF
+          [Desktop Entry]
+          Type=Application
+          Name=Motorz
+          Comment=Carnet de bord de vos véhicules
+          Exec=motorz
+          Icon=motorz
+          Categories=Utility;
+          Terminal=false
+          StartupWMClass=fr.dtfh.motorz
+          EOF
+
+          cp assets/icon/app_icon.png "$APPDIR/motorz.png"
+
+      - name: Download appimagetool
+        run: |
+          wget -q -O appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+      - name: Build AppImage
+        # `--appimage-extract-and-run` : appimagetool est lui-même un AppImage
+        # qui requiert FUSE2 pour s'auto-monter. Sur GHA, FUSE n'est pas dispo.
+        run: |
+          APPIMAGE_NAME="Motorz-${VERSION}-${{ github.run_number }}-x86_64.AppImage"
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "$APPIMAGE_NAME"
+          echo "APPIMAGE_NAME=$APPIMAGE_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motorz-linux
+          path: ${{ env.APPIMAGE_NAME }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ───────────────────────────────────────────────────────────────────────
+  # UPDATER — Binaire installateur/launcher/auto-updater (Windows + Linux).
+  # Petit CLI Dart (tool/updater), indépendant des builds d'app : attaché à
+  # la release pour que l'utilisateur le télécharge une seule fois, puis il
+  # se met à jour seul (app ET updater).
+  # ───────────────────────────────────────────────────────────────────────
+
+  build-updater:
+    name: Build Updater (${{ matrix.label }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+            out: motorz-updater-windows.exe
+            artifact: motorz-updater-windows
+          - os: ubuntu-22.04
+            label: Linux
+            out: motorz-updater-linux
+            artifact: motorz-updater-linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.11.5"
+
+      - name: Resolve updater deps
+        working-directory: tool/updater
+        run: dart pub get
+
+      # Sous-système console : l'install affiche ses prompts ; les lancements
+      # quotidiens passent par un wrapper caché (VBS Windows / .desktop Linux).
+      - name: Compile updater
+        working-directory: tool/updater
+        run: dart compile exe bin/motorz_updater.dart -o "${{ matrix.out }}"
+
+      - name: Upload updater artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: tool/updater/${{ matrix.out }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════════════════════════════════════
   # BUILD GATE — Sentinelle qui valide que les builds sont verts
   # ═══════════════════════════════════════════════════════════════════════
 
   build-gate:
     name: All builds passed
-    needs: [build-android, build-macos]
+    needs: [build-android, build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -468,7 +691,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [prepare, publish-android, publish-macos]
+    needs: [prepare, publish-android, publish-macos, build-windows, build-linux, build-updater]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -495,7 +718,11 @@ jobs:
             [ -n "$f" ] || continue
             echo "  - $f"
             ASSETS+=("$f")
-          done < <(find artifacts -type f \( -name '*.aab' -o -name '*.apk' -o -name '*.pkg' \) | sort)
+          done < <(find artifacts -type f \( \
+            -name '*.aab' -o -name '*.apk' -o -name '*.pkg' \
+            -o -name '*.zip' -o -name '*.AppImage' \
+            -o -name 'motorz-updater-windows.exe' -o -name 'motorz-updater-linux' \
+            \) | sort)
 
           if [ ${#ASSETS[@]} -eq 0 ]; then
             echo "ERROR: no release assets found"
