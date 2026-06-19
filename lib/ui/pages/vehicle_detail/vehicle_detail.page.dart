@@ -871,7 +871,7 @@ class _WheelCell extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (filled) ...[
-              Text(m.tire.descriptor,
+              Text(m.tire.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
@@ -912,7 +912,7 @@ class _TireCard extends StatelessWidget {
     return EntryCard(
       icon: Icons.trip_origin,
       iconColor: colors.accent,
-      title: t.descriptor,
+      title: t.displayName,
       subtitle: specs,
       trailing: Column(
         mainAxisSize: MainAxisSize.min,

@@ -51,6 +51,7 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
   final _model = TextEditingController();
   final _size = TextEditingController();
   final _sizeFocus = FocusNode();
+  final _marker = TextEditingController();
   final _rimSpec = TextEditingController();
   final _price = TextEditingController();
   final _notes = TextEditingController();
@@ -71,6 +72,7 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
       _brand.text = e.brand ?? '';
       _model.text = e.model ?? '';
       _size.text = e.size ?? '';
+      _marker.text = e.marker ?? '';
       _rimSpec.text = e.rimSpec ?? '';
       if (e.purchasePrice != null) _price.text = _fmtInput(e.purchasePrice!);
       _notes.text = e.notes ?? '';
@@ -90,7 +92,7 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
 
   @override
   void dispose() {
-    for (final c in [_brand, _model, _size, _rimSpec, _price, _notes]) {
+    for (final c in [_brand, _model, _size, _marker, _rimSpec, _price, _notes]) {
       c.dispose();
     }
     _brandFocus.dispose();
@@ -122,6 +124,7 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
       brand: _emptyToNull(_brand),
       model: _emptyToNull(_model),
       size: _emptyToNull(_size),
+      marker: _emptyToNull(_marker),
       rimMaterial: _rimMaterial,
       rimSpec: _emptyToNull(_rimSpec),
       season: _season,
@@ -303,6 +306,17 @@ class _TireSheetState extends ConsumerState<_TireSheet> {
               label: 'Taille',
               hint: '255/40 R19',
               options: sizes,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('tireMarkerField'),
+              controller: _marker,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Repère (optionnel)',
+                hintText: 'A, 1, marqué bleu…',
+                helperText: 'Pour distinguer deux pneus identiques.',
+              ),
             ),
             const SizedBox(height: 12),
             Row(

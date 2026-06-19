@@ -120,7 +120,7 @@ class _MountTireSheetState extends ConsumerState<_MountTireSheet> {
   }
 
   String _tireLabel(Tire t, String? currentPos) {
-    final bits = [t.descriptor, if (t.size != null && t.size!.isNotEmpty) t.size!].join(' · ');
+    final bits = [t.displayName, if (t.size != null && t.size!.isNotEmpty) t.size!].join(' · ');
     final where = currentPos == null ? 'en stock' : positionLabel(currentPos);
     return '$bits — $where';
   }
@@ -165,7 +165,7 @@ class _MountTireSheetState extends ConsumerState<_MountTireSheet> {
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             if (occupantTire != null)
-              Text('Actuellement : ${occupantTire.descriptor}'
+              Text('Actuellement : ${occupantTire.displayName}'
                   '${occupantTire.size != null ? ' · ${occupantTire.size}' : ''}',
                   style: TextStyle(color: colors.textMuted))
             else

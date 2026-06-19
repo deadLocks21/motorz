@@ -247,7 +247,7 @@ Future<List<TargetPressure>> targetPressures(Ref ref, String vehicleId) async {
 Future<List<Tire>> tires(Ref ref, String vehicleId) async {
   ref.watch(storeChangesProvider);
   final list = await ref.watch(tireRepositoryProvider).listForVehicle(vehicleId);
-  list.sort((a, b) => a.descriptor.toLowerCase().compareTo(b.descriptor.toLowerCase()));
+  list.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
   return list;
 }
 
@@ -313,7 +313,7 @@ int _compareInventoryRows(TireInventoryRow a, TireInventoryRow b) {
   if (byPos != 0) return byPos;
   final bySeason = _seasonRank(a.tire.season).compareTo(_seasonRank(b.tire.season));
   if (bySeason != 0) return bySeason;
-  return a.tire.descriptor.toLowerCase().compareTo(b.tire.descriptor.toLowerCase());
+  return a.tire.displayName.toLowerCase().compareTo(b.tire.displayName.toLowerCase());
 }
 
 /// Marques de pneus déjà saisies (tous véhicules) — autocomplétion du champ

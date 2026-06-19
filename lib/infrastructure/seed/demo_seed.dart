@@ -226,6 +226,7 @@ class DemoSeed {
       String? purchaseDate,
       double? price,
       String? disposedDate,
+      String? marker,
     }) =>
         Tire(
           id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000a$suffix'),
@@ -233,6 +234,7 @@ class DemoSeed {
           brand: brand,
           model: model,
           size: size,
+          marker: marker,
           rimMaterial: rim,
           rimSpec: rimSpec,
           season: season,
@@ -306,8 +308,9 @@ class DemoSeed {
           price: 330),
       // Roue de secours (galette).
       t('0007', model: 'Galette', size: 'T135/90 R17', rim: RimMaterial.tole, purchaseDate: '2024-03-15'),
-      // Jeu hiver complet, en stock.
-      for (final n in ['0008', '0009', '000a', '000b'])
+      // Jeu hiver complet, en stock — repérés H1..H4 (pneus identiques) pour les
+      // distinguer.
+      for (final (n, mark) in [('0008', 'H1'), ('0009', 'H2'), ('000a', 'H3'), ('000b', 'H4')])
         t(n,
             brand: 'Michelin',
             model: 'Pilot Alpin 5',
@@ -315,7 +318,8 @@ class DemoSeed {
             rim: RimMaterial.tole,
             season: TireSeason.hiver,
             purchaseDate: '2024-11-02',
-            price: 210),
+            price: 210,
+            marker: mark),
     ];
   }
 

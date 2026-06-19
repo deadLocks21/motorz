@@ -100,7 +100,7 @@ class _TireDetailPageState extends ConsumerState<TireDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.descriptor),
+        title: Text(t.displayName),
         actions: [
           IconButton(
             key: const Key('tireEditButton'),

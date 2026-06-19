@@ -13,6 +13,10 @@ class Tire {
 
   /// Taille pneu en texte libre, ex. « 255/40 R19 ».
   final String? size;
+
+  /// Repère libre pour distinguer deux pneus identiques (ex. « A », « 1 »,
+  /// « marqué bleu ») — en miroir d'une marque physique sur le pneu.
+  final String? marker;
   final RimMaterial? rimMaterial;
 
   /// Dimension de jante en texte libre, ex. « 8J×19 ET40 ».
@@ -38,6 +42,7 @@ class Tire {
     this.brand,
     this.model,
     this.size,
+    this.marker,
     this.rimMaterial,
     this.rimSpec,
     this.season,
@@ -56,6 +61,13 @@ class Tire {
   String get descriptor {
     final parts = [brand, model].where((p) => p != null && p.isNotEmpty).join(' ');
     return parts.isEmpty ? 'Pneu' : parts;
+  }
+
+  /// Libellé d'affichage : descriptor + repère s'il existe, pour distinguer deux
+  /// pneus identiques. Ex. « Michelin Pilot Sport 4S · A ».
+  String get displayName {
+    final m = marker?.trim();
+    return (m == null || m.isEmpty) ? descriptor : '$descriptor · $m';
   }
 
   @override

@@ -58,12 +58,16 @@ void main() {
   }
 
   // Ajoute un pneu Michelin via le bouton « Ajouter » de l'onglet Pneus.
-  Future<void> addTire(WidgetTester tester, {String model = '', String size = ''}) async {
+  Future<void> addTire(WidgetTester tester,
+      {String model = '', String size = '', String marker = ''}) async {
     await tester.tap(find.widgetWithText(TextButton, 'Ajouter'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('tireBrandField')), 'Michelin');
     if (model.isNotEmpty) await tester.enterText(find.byKey(const Key('tireModelField')), model);
     if (size.isNotEmpty) await tester.enterText(find.byKey(const Key('tireSizeField')), size);
+    if (marker.isNotEmpty) {
+      await tester.enterText(find.byKey(const Key('tireMarkerField')), marker);
+    }
     final saveTire = find.byKey(const Key('saveTireButton'));
     await tester.ensureVisible(saveTire);
     await tester.pumpAndSettle();
@@ -138,6 +142,22 @@ void main() {
     expect(find.text('Relevés'), findsOneWidget);
     expect(find.text('Définir une pression cible'), findsOneWidget);
     expect(find.text('Inventaire'), findsNothing); // l'inventaire reste sur Pneus
+  });
+
+  testWidgets('le repère distingue deux pneus identiques (displayName)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final (store, vehicleId) = await seed();
+    await pumpDetail(tester, store, vehicleId);
+
+    await tester.tap(find.text('Pneus'));
+    await tester.pumpAndSettle();
+    await addTire(tester, marker: 'A');
+
+    // Le repère est enregistré et apparaît dans le libellé de l'inventaire.
+    final tires = await store.query('tires');
+    expect(tires.single['marker'], 'A');
+    expect(find.text('Michelin · A'), findsOneWidget);
   });
 
   testWidgets('mettre au rebut (depuis la page détail) : démontage auto, pneu gardé', (tester) async {

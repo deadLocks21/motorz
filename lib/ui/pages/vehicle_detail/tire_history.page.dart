@@ -142,7 +142,7 @@ class _Timeline extends StatelessWidget {
           Expanded(
             child: Text.rich(TextSpan(children: [
               TextSpan(text: '$verb · ', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-              TextSpan(text: e.tire.descriptor),
+              TextSpan(text: e.tire.displayName),
               TextSpan(text: '  ·  $where', style: TextStyle(color: colors.textMuted)),
             ])),
           ),
@@ -196,7 +196,7 @@ class _PositionHistory extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 5),
           child: ListTile(
             leading: Icon(Icons.trip_origin, color: m.isOpen ? colors.accent : colors.textMuted),
-            title: Text(tire?.descriptor ?? 'Pneu',
+            title: Text(tire?.displayName ?? 'Pneu',
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text('${formatKm(m.mountedOdometer)} → $endLabel'
                 '${span != null && span > 0 ? '  ·  ${formatKm(span)} roulés' : ''}'),

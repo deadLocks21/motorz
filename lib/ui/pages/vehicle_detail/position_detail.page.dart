@@ -61,7 +61,7 @@ class PositionDetailPage extends ConsumerWidget {
                   )
                 : ListTile(
                     leading: Icon(Icons.trip_origin, color: colors.accent),
-                    title: Text(mountedTire.descriptor,
+                    title: Text(mountedTire.displayName,
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text([
                       if (mountedTire.size != null && mountedTire.size!.isNotEmpty) mountedTire.size!,
@@ -98,7 +98,7 @@ class PositionDetailPage extends ConsumerWidget {
                 child: ListTile(
                   leading:
                       Icon(Icons.trip_origin, color: m.isOpen ? colors.accent : colors.textMuted),
-                  title: Text(tire?.descriptor ?? 'Pneu',
+                  title: Text(tire?.displayName ?? 'Pneu',
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text('${formatKm(m.mountedOdometer)} → $endLabel'
                       '${span != null && span > 0 ? '  ·  ${formatKm(span)} roulés' : ''}'),
