@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
@@ -219,12 +220,7 @@ class _OverviewTab extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Text('Identité', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        _kv('Type', vehicle.type.label),
-        _kv('Description', vehicle.descriptor),
-        if (vehicle.licensePlate != null) _kv('Plaque', vehicle.licensePlate!),
-        if (vehicle.fuelType != null) _kv('Carburant', vehicle.fuelType!.label),
+        _IdentitySection(vehicle: vehicle),
         const SizedBox(height: 24),
         Text('Prochaines échéances', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
@@ -251,15 +247,130 @@ class _OverviewTab extends ConsumerWidget {
     );
   }
 
-  Widget _kv(String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(
+}
+
+/// Carte « Identité » : en première instance, les identifiants qu'on copie le
+/// plus (plaque, VIN) sous forme de chips tapables ; le reste des infos
+/// techniques/administratives est replié sous « Détails techniques ».
+class _IdentitySection extends StatelessWidget {
+  const _IdentitySection({required this.vehicle});
+  final Vehicle vehicle;
+
+  static void _copy(BuildContext context, String label, String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('$label copié'), duration: const Duration(seconds: 2)),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+
+    final chips = <Widget>[
+      if (vehicle.licensePlate != null)
+        _CopyChip(label: 'Plaque', value: vehicle.licensePlate!, onCopy: _copy),
+      if (vehicle.vin != null && vehicle.vin!.isNotEmpty)
+        _CopyChip(label: 'VIN', value: vehicle.vin!, onCopy: _copy),
+    ];
+
+    final details = <Widget>[
+      if (vehicle.make != null && vehicle.make!.isNotEmpty) _kv(context, 'Marque', vehicle.make!),
+      if (vehicle.model != null && vehicle.model!.isNotEmpty) _kv(context, 'Modèle', vehicle.model!),
+      if (vehicle.trim != null && vehicle.trim!.isNotEmpty) _kv(context, 'Finition', vehicle.trim!),
+      if (vehicle.year != null) _kv(context, 'Année', vehicle.year!.toString()),
+      if (vehicle.firstRegistrationDate != null) _kv(context, '1re immat.', vehicle.firstRegistrationDate!),
+      if (vehicle.fuelType != null) _kv(context, 'Carburant', vehicle.fuelType!.label),
+      if (vehicle.engineCc != null) _kv(context, 'Cylindrée', '${vehicle.engineCc} cm³'),
+      if (vehicle.powerHp != null) _kv(context, 'Puissance', '${vehicle.powerHp} ch'),
+      if (vehicle.color != null && vehicle.color!.isNotEmpty) _kv(context, 'Couleur', vehicle.color!),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 120, child: Text(k)),
-        Expanded(child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600))),
+        Text('Identité', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(vehicle.descriptor, style: TextStyle(color: colors.textMuted)),
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: chips),
+        ],
+        if (details.isNotEmpty)
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 4),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              title: Text(
+                'Détails techniques',
+                style: TextStyle(color: colors.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              children: details,
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _kv(BuildContext context, String k, String v) => InkWell(
+    onTap: () => _copy(context, k, v),
+    borderRadius: BorderRadius.circular(6),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 120, child: Text(k)),
+          Expanded(child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600))),
+        ],
+      ),
     ),
   );
+}
+
+/// Pastille tapable : label + valeur, copie au tap.
+class _CopyChip extends StatelessWidget {
+  const _CopyChip({required this.label, required this.value, required this.onCopy});
+  final String label;
+  final String value;
+  final void Function(BuildContext, String, String) onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return InkWell(
+      onTap: () => onCopy(context, label, value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: TextStyle(color: colors.textMuted, fontSize: 11)),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(width: 8),
+                Icon(Icons.copy_outlined, size: 15, color: colors.textMuted),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _StatTile extends StatelessWidget {
