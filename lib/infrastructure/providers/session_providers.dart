@@ -19,7 +19,7 @@ class SessionController extends _$SessionController {
 
   /// Demande un OTP. Lève [AuthException] en cas d'échec (dont `accountNotFound`
   /// si le numéro n'a pas de compte — l'inscription n'existe pas côté app).
-  Future<void> requestOtp(String rawPhone) async {
+  Future<void> requestOtp(String rawPhone, {OtpReason reason = OtpReason.login}) async {
     final logger = ref.read(loggerProvider);
     final PhoneNumber phone;
     try {
@@ -30,11 +30,63 @@ class SessionController extends _$SessionController {
     }
     try {
       final expiresAt = await ref.read(authRepositoryProvider).requestOtp(phone);
-      state = OtpRequested(phone: phone, expiresAt: expiresAt);
-      logger.info('auth.otp.requested');
+      state = OtpRequested(phone: phone, expiresAt: expiresAt, reason: reason);
+      logger.info('auth.otp.requested', attrs: {'auth.reason': reason.name});
     } on AuthException catch (e) {
       logger.warn('auth.otp.request_failed', attrs: {'auth.code': e.code.name});
       rethrow;
+    }
+  }
+
+  /// Le serveur a refusé le token (401 `invalid_token`) : on lâche la session et
+  /// on renvoie un SMS au numéro du compte, pour que l'utilisateur n'ait plus
+  /// qu'à saisir le code.
+  ///
+  /// Contrairement à [logout], **aucune purge locale** : l'utilisateur n'a pas
+  /// demandé à partir, ses écritures encore en file doivent survivre à
+  /// l'expiration.
+  ///
+  /// Le passage immédiat hors de [Authenticated] fait office de garde de
+  /// ré-entrance : les requêtes concurrentes qui prennent aussi un 401 retombent
+  /// ici sans redéclencher d'envoi de SMS (le quota serveur est de 3 / 15 min).
+  Future<void> expire() async {
+    final current = state;
+    if (current is! Authenticated) return;
+    final logger = ref.read(loggerProvider);
+    logger.warn('auth.session.expired');
+
+    final PhoneNumber phone;
+    try {
+      phone = PhoneNumber.parse(current.session.user.phoneNumber);
+    } on FormatException {
+      // Numéro illisible : on ne peut pas pré-remplir, retour à la saisie.
+      await ref.read(sessionRepositoryProvider).clear();
+      state = const Anonymous();
+      return;
+    }
+
+    // D'abord l'état : `currentSession` repasse à null, l'interceptor cesse
+    // d'attacher le token mort aux requêtes en vol.
+    state = SessionExpired(phone);
+    await ref.read(sessionRepositoryProvider).clear();
+    try {
+      await requestOtp(phone.e164, reason: OtpReason.sessionExpired);
+    } on AuthException catch (e) {
+      // Renvoi impossible (quota, réseau, compte supprimé) : on reste sur
+      // l'écran OTP avec l'erreur et un bouton « Réessayer ».
+      if (state is SessionExpired) state = SessionExpired(phone, error: e.code);
+    }
+  }
+
+  /// Relance l'envoi du SMS après un échec de [expire].
+  Future<void> retryExpiredOtp() async {
+    final current = state;
+    if (current is! SessionExpired) return;
+    state = SessionExpired(current.phone);
+    try {
+      await requestOtp(current.phone.e164, reason: OtpReason.sessionExpired);
+    } on AuthException catch (e) {
+      if (state is SessionExpired) state = SessionExpired(current.phone, error: e.code);
     }
   }
 

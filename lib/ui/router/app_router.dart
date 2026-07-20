@@ -35,7 +35,8 @@ GoRouter goRouter(Ref ref) {
       final loc = goState.matchedLocation;
       return switch (session) {
         Anonymous() => loc == AppRoutes.auth ? null : AppRoutes.auth,
-        OtpRequested() => loc == AppRoutes.otp ? null : AppRoutes.otp,
+        // Session expirée : on saute la saisie du numéro, le SMS part tout seul.
+        OtpRequested() || SessionExpired() => loc == AppRoutes.otp ? null : AppRoutes.otp,
         Authenticated() => loc.startsWith('/auth') ? AppRoutes.garage : null,
       };
     },

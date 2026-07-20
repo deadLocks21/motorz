@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:motorz/core/domain/services/auth.repository.dart';
@@ -60,7 +62,12 @@ Dio dio(Ref ref) {
       responseType: ResponseType.json,
     ),
   );
-  dio.interceptors.add(AuthInterceptor(session: () => ref.read(currentSessionProvider)));
+  dio.interceptors.add(AuthInterceptor(
+    session: () => ref.read(currentSessionProvider),
+    // Lecture paresseuse du notifier : `authRepository` dépend de ce provider,
+    // la résoudre ici créerait un cycle.
+    onUnauthorized: () => unawaited(ref.read(sessionControllerProvider.notifier).expire()),
+  ));
   return dio;
 }
 
