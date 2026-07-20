@@ -963,7 +963,7 @@ final class TiresProvider
   }
 }
 
-String _$tiresHash() => r'9ee7378abd682730a38fb7cc642808fb69bcea00';
+String _$tiresHash() => r'ad86b493e939cad66370c104f3cf9bb05e796df2';
 
 /// Inventaire de pneus du véhicule (montés + en stock).
 
@@ -1125,7 +1125,7 @@ final class TireFleetProvider
   }
 }
 
-String _$tireFleetHash() => r'0e1071b6ebc2d2bf6c29ce34f0498dc39af83413';
+String _$tireFleetHash() => r'0a9f73ebd2d18064ce6fa6bb8cfd80ee186d5a59';
 
 final class TireFleetFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<TireFleet>, String> {

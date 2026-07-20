@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:motorz/core/application/session_state.dart';
+import 'package:motorz/core/application/sync/sync_conflict.dart';
 import 'package:motorz/core/domain/exceptions/auth_exception.dart';
 import 'package:motorz/core/domain/model/phone_number.dart';
 import 'package:motorz/core/domain/model/session.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/logger_providers.dart';
 import 'package:motorz/infrastructure/seed/demo_seed.dart';
+import 'package:motorz/infrastructure/sync/sync_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'session_providers.g.dart';
@@ -101,14 +103,14 @@ class SessionController extends _$SessionController {
             code: code,
             device: device,
           );
-      await _authenticate(session);
+      await _authenticate(session, reason: current.reason);
     } on AuthException catch (e) {
       ref.read(loggerProvider).warn('auth.otp.verify_failed', attrs: {'auth.code': e.code.name});
       rethrow;
     }
   }
 
-  Future<void> _authenticate(Session session) async {
+  Future<void> _authenticate(Session session, {required OtpReason reason}) async {
     await ref.read(sessionRepositoryProvider).write(session);
     state = Authenticated(session);
     // `state` est désormais Authenticated → le résolveur de contexte attache
@@ -121,10 +123,35 @@ class SessionController extends _$SessionController {
       // compte démo connecté (idempotent). Le store ayant été purgé à la
       // déconnexion précédente, le seed rejoue à chaque nouvelle session de démo.
       await DemoSeed(ref.read(localRecordStoreProvider), session.user.id).ensureSeeded();
+    } else if (reason == OtpReason.sessionExpired) {
+      await _reconnect(sync);
     } else {
-      // Au login serveur, on repart de la vérité serveur : on vide l'état local
-      // (store + file + curseur) avant de tout rapatrier.
+      // Vrai login : le compte peut avoir changé, l'état local hérité d'une
+      // session précédente n'a plus de sens. On repart de la vérité serveur.
       unawaited(sync.resetToRemote());
+    }
+  }
+
+  /// Reconnexion après expiration : c'est forcément le même compte (l'OTP a été
+  /// demandé sur le numéro de la session expirée), donc la file locale est
+  /// légitime — on ne la jette pas comme au login.
+  ///
+  /// On regarde d'abord ce qui a bougé des deux côtés : sans arbitrage, pousser
+  /// ferait disparaître une des deux versions en silence (last-write-wins
+  /// serveur).
+  Future<void> _reconnect(SyncService sync) async {
+    try {
+      final conflicts = await sync.detectConflicts();
+      if (conflicts.isEmpty) {
+        unawaited(sync.syncNow());
+        return;
+      }
+      ref.read(pendingConflictsProvider.notifier).replace(conflicts);
+    } catch (e, st) {
+      // Détection impossible (réseau, serveur) : on ne bloque pas la
+      // reconnexion. La file reste intacte, la synchro réessaiera.
+      ref.read(loggerProvider).error('sync.conflicts.detect_failed', error: e, stack: st);
+      unawaited(sync.syncNow());
     }
   }
 
@@ -153,6 +180,18 @@ class SessionController extends _$SessionController {
 Session? currentSession(Ref ref) {
   final state = ref.watch(sessionControllerProvider);
   return state is Authenticated ? state.session : null;
+}
+
+/// Conflits en attente d'arbitrage après une reconnexion. Non vide → le router
+/// dérive vers l'écran de réconciliation, qui est le seul à pouvoir les vider.
+@Riverpod(keepAlive: true)
+class PendingConflicts extends _$PendingConflicts {
+  @override
+  List<SyncConflict> build() => const [];
+
+  void replace(List<SyncConflict> conflicts) => state = List.unmodifiable(conflicts);
+
+  void clear() => state = const [];
 }
 
 /// Amorce l'app : charge l'URL d'API, restaure la session, démarre la synchro.

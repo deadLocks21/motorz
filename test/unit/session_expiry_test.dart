@@ -15,6 +15,7 @@ import 'package:motorz/infrastructure/connectivity/connectivity_plus.service.dar
 import 'package:motorz/infrastructure/http/auth_interceptor.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/infrastructure/sync/sync_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Délègue à l'impl mémoire, mais peut faire échouer les demandes d'OTP à la
@@ -181,6 +182,92 @@ void main() {
     });
   });
 
+  group('Reconnexion : sort de la file locale', () {
+    /// Conteneur en mode serveur (et non `memory`), seul mode où la synchro
+    /// tourne — c'est là que la file risquait d'être vidée.
+    ({ProviderContainer container, _FakeSyncApi api}) serverContainer() {
+      auth = _FlakyAuthRepository();
+      final api = _FakeSyncApi();
+      final c = ProviderContainer(overrides: [
+        connectivityServiceProvider.overrideWithValue(const AlwaysOnlineConnectivityService()),
+        authRepositoryProvider.overrideWithValue(auth),
+        apiBaseUrlProvider.overrideWith(_FakeApiBaseUrl.new),
+        syncApiProvider.overrideWithValue(api),
+      ]);
+      addTearDown(c.dispose);
+      return (container: c, api: api);
+    }
+
+    /// Déroule le scénario réel : login, puis saisie locale, puis expiration du
+    /// token, puis reconnexion. La saisie doit arriver **après** le login — un
+    /// vrai login vide légitimement la file (le compte peut avoir changé).
+    Future<void> loginThenExpire(
+      ProviderContainer c,
+      Future<void> Function() workOffline,
+    ) async {
+      final ctrl = c.read(sessionControllerProvider.notifier);
+      await ctrl.requestOtp('0612345678');
+      await ctrl.verifyOtp('000000');
+      // `resetToRemote()` est lancé sans await par `_authenticate` : lui laisser
+      // le temps de finir, sinon il viderait la file saisie juste après.
+      await Future<void>.delayed(Duration.zero);
+      await workOffline();
+      await ctrl.expire();
+      await ctrl.verifyOtp('000000');
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    Future<void> Function() enqueueFuel(ProviderContainer c) => () => c
+        .read(pendingQueueProvider)
+        .enqueue('fuel_entries', 'f-1', {
+          'id': 'f-1',
+          'station': 'Total Nation',
+          'updated_at': '2026-05-27T09:00:00Z',
+        });
+
+    test('le mode serveur est bien actif (sinon les cas suivants ne prouvent rien)', () {
+      final (:container, api: _) = serverContainer();
+      expect(isMemoryMode(container.read(apiBaseUrlProvider)), isFalse);
+      expect(container.read(syncServiceProvider).enabled, isTrue);
+    });
+
+    test('une saisie hors ligne survit à l\'expiration puis à la reconnexion', () async {
+      // Le cœur du problème : la reconnexion passait par `resetToRemote()`, qui
+      // vide la file — une saisie faite hors ligne juste avant l'expiration
+      // disparaissait sans un mot.
+      final (:container, :api) = serverContainer();
+
+      await loginThenExpire(container, enqueueFuel(container));
+
+      expect(api.pushed, isNotEmpty, reason: 'la saisie doit finir par partir');
+      expect(api.pushed.last['fuel_entries']!.single['station'], 'Total Nation');
+    });
+
+    test('une divergence des deux côtés est soumise à l\'arbitrage', () async {
+      final (:container, :api) = serverContainer();
+
+      await loginThenExpire(container, () async {
+        await enqueueFuel(container)();
+        // Pendant la déconnexion, quelqu'un d'autre a modifié le même plein.
+        api.serverState = {
+          'fuel_entries': [
+            {
+              'id': 'f-1',
+              'station': 'Esso Wagram',
+              'updated_at': '2026-05-27T12:00:00Z',
+            },
+          ],
+        };
+      });
+
+      final conflicts = container.read(pendingConflictsProvider);
+      expect(conflicts, hasLength(1));
+      expect(conflicts.single.changedFields, ['station']);
+      expect(api.pushed, isEmpty,
+          reason: 'rien ne doit partir tant que l\'utilisateur n\'a pas tranché');
+    });
+  });
+
   group('AuthInterceptor : détection du token refusé', () {
     test('un 401 invalid_token signale la session expirée', () async {
       expect(await unauthorizedSignals(), 1);
@@ -203,6 +290,34 @@ void main() {
       expect(await unauthorizedSignals(status: 500, code: null), 0);
     });
   });
+}
+
+/// Force le mode serveur : en `memory` la synchro est neutralisée et le flux de
+/// reconnexion ne s'exécute pas.
+class _FakeApiBaseUrl extends ApiBaseUrl {
+  @override
+  String build() => 'https://api.test';
+
+  @override
+  Future<void> load() async {}
+}
+
+/// SyncApi fictif : état serveur pilotable, pushes enregistrés.
+class _FakeSyncApi extends SyncApi {
+  _FakeSyncApi() : super(Dio());
+
+  Map<String, List<Map<String, dynamic>>> serverState = {};
+  final List<Map<String, List<Map<String, dynamic>>>> pushed = [];
+
+  @override
+  Future<PullResult> pull(String? since) async =>
+      PullResult(serverTime: '2026-05-27T00:00:00Z', changes: serverState);
+
+  @override
+  Future<PushResult> push(Map<String, List<Map<String, dynamic>>> changes) async {
+    pushed.add(changes);
+    return const PushResult(rejected: []);
+  }
 }
 
 /// Répond toujours le même statut/code d'erreur, sans réseau.

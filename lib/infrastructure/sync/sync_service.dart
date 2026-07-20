@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:motorz/core/application/services/logger_application.service.dart';
+import 'package:motorz/core/application/sync/sync_conflict.dart';
 import 'package:motorz/core/domain/services/connectivity.service.dart';
 import 'package:motorz/infrastructure/sync/local_record_store.dart';
 import 'package:motorz/infrastructure/sync/pending_queue.dart';
@@ -129,6 +130,90 @@ class SyncService {
         _setStatus(_status.copyWith(phase: SyncPhase.offline));
       }
     });
+  }
+
+  /// Repère les entités modifiées **des deux côtés** : encore en file (jamais
+  /// poussées) et déjà changées sur le serveur depuis la dernière synchro.
+  ///
+  /// Purement consultatif — ne touche ni au store, ni à la file, ni au curseur.
+  /// C'est volontaire : la détection sert à *demander* avant d'écraser quoi que
+  /// ce soit, donc elle doit pouvoir être abandonnée sans laisser de trace.
+  ///
+  /// Le serveur applique un last-write-wins muet (il jette la ligne la plus
+  /// ancienne sans le signaler), d'où la comparaison locale des `updated_at`
+  /// plutôt qu'une remontée serveur : au moment où il répond, la perte est déjà
+  /// consommée.
+  Future<List<SyncConflict>> detectConflicts() async {
+    if (!enabled || _disposed) return const [];
+    final ops = await _queue.readAll();
+    if (ops.isEmpty) return const [];
+
+    final pulled = await _api.pull(await _cursor.read());
+    final serverRows = <String, Map<String, dynamic>>{};
+    for (final entry in pulled.changes.entries) {
+      for (final row in entry.value) {
+        serverRows['${entry.key}/${row['id']}'] = row;
+      }
+    }
+
+    final conflicts = <SyncConflict>[];
+    for (final op in ops) {
+      final server = serverRows['${op.resource}/${op.entityId}'];
+      // Absent du delta = le serveur n'a pas touché cette entité depuis notre
+      // dernière synchro : le push passera sans rien écraser.
+      if (server == null) continue;
+      final serverAt = DateTime.tryParse(server['updated_at'] as String? ?? '');
+      final localAt = DateTime.tryParse(op.data['updated_at'] as String? ?? '');
+      if (serverAt == null || localAt == null) continue;
+      if (serverAt.isAfter(localAt)) {
+        conflicts.add(SyncConflict(local: op, server: server));
+      }
+    }
+    if (conflicts.isNotEmpty) {
+      _logger?.warn('sync.conflicts.detected', attrs: {'sync.conflicts': conflicts.length});
+    }
+    return conflicts;
+  }
+
+  /// Applique les arbitrages de [detectConflicts], puis synchronise.
+  ///
+  /// `keepLocal` **re-date** la ligne : sans cela le serveur la rejetterait de
+  /// nouveau en silence (sa version est plus récente), et « garder ma version »
+  /// ne ferait rien du tout. `keepServer` sort l'op de la file — le pull qui
+  /// suit ramène la ligne serveur dans le store.
+  Future<void> resolveConflicts(Map<String, ConflictChoice> choices) async {
+    if (!enabled || _disposed) return;
+    await _lock.synchronized(() async {
+      for (final entry in choices.entries) {
+        final sep = entry.key.indexOf('/');
+        final resource = entry.key.substring(0, sep);
+        final entityId = entry.key.substring(sep + 1);
+        switch (entry.value) {
+          case ConflictChoice.keepServer:
+            await _queue.remove(resource, entityId);
+          case ConflictChoice.keepLocal:
+            final ops = await _queue.readAll();
+            final op = ops
+                .where((o) => o.resource == resource && o.entityId == entityId)
+                .firstOrNull;
+            if (op == null) break;
+            final redated = {
+              ...op.data,
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            };
+            await _queue.enqueue(resource, entityId, redated);
+            // Le store suit, sinon l'UI afficherait encore l'ancienne ligne
+            // jusqu'au prochain pull.
+            await _store.put(resource, redated);
+        }
+      }
+    });
+    _logger?.info('sync.conflicts.resolved', attrs: {
+      'sync.kept_local': choices.values.where((c) => c == ConflictChoice.keepLocal).length,
+      'sync.kept_server': choices.values.where((c) => c == ConflictChoice.keepServer).length,
+    });
+    await _refreshCounts();
+    await syncNow();
   }
 
   /// Réinitialise l'état local et le repeuple depuis le serveur, pris comme

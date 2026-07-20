@@ -103,7 +103,7 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'58f585863ede4cbbcaf052fd021021ba145200ca';
+String _$dioHash() => r'2b6b77f3085216523c92c9c7c50a7b06fddf2c46';
 
 @ProviderFor(connectivityService)
 final connectivityServiceProvider = ConnectivityServiceProvider._();

@@ -6,6 +6,7 @@ import 'package:motorz/ui/pages/auth/otp_verify.page.dart';
 import 'package:motorz/ui/pages/auth/phone_entry.page.dart';
 import 'package:motorz/ui/pages/garage/garage.page.dart';
 import 'package:motorz/ui/pages/settings/settings.page.dart';
+import 'package:motorz/ui/pages/sync/reconciliation.page.dart';
 import 'package:motorz/ui/pages/vehicle_detail/vehicle_detail.page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -16,6 +17,7 @@ abstract final class AppRoutes {
   static const otp = '/auth/otp';
   static const garage = '/';
   static const settings = '/settings';
+  static const reconciliation = '/sync/conflicts';
   static String vehicle(String id) => '/vehicle/$id';
 }
 
@@ -25,6 +27,7 @@ abstract final class AppRoutes {
 GoRouter goRouter(Ref ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(sessionControllerProvider, (_, _) => refresh.value++);
+  ref.listen(pendingConflictsProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -37,12 +40,22 @@ GoRouter goRouter(Ref ref) {
         Anonymous() => loc == AppRoutes.auth ? null : AppRoutes.auth,
         // Session expirée : on saute la saisie du numéro, le SMS part tout seul.
         OtpRequested() || SessionExpired() => loc == AppRoutes.otp ? null : AppRoutes.otp,
-        Authenticated() => loc.startsWith('/auth') ? AppRoutes.garage : null,
+        // Des conflits en attente monopolisent la navigation : tant qu'ils ne
+        // sont pas arbitrés, toute synchro écraserait une des deux versions.
+        Authenticated() when ref.read(pendingConflictsProvider).isNotEmpty =>
+          loc == AppRoutes.reconciliation ? null : AppRoutes.reconciliation,
+        Authenticated() => loc.startsWith('/auth') || loc == AppRoutes.reconciliation
+            ? AppRoutes.garage
+            : null,
       };
     },
     routes: [
       GoRoute(path: AppRoutes.auth, builder: (_, _) => const PhoneEntryPage()),
       GoRoute(path: AppRoutes.otp, builder: (_, _) => const OtpVerifyPage()),
+      GoRoute(
+        path: AppRoutes.reconciliation,
+        builder: (_, _) => const ReconciliationPage(),
+      ),
       GoRoute(path: AppRoutes.garage, builder: (_, _) => const GaragePage()),
       GoRoute(path: AppRoutes.settings, builder: (_, _) => const SettingsPage()),
       GoRoute(
