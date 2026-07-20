@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:motorz/core/application/sync/entity_codecs.dart';
+import 'package:motorz/core/domain/model/media_category.dart';
 import 'package:motorz/core/domain/model/media_item.dart';
 import 'package:motorz/infrastructure/providers/infra_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
@@ -30,22 +31,81 @@ Future<void> uploadDocument(
   if (file == null || bytes == null) return;
 
   final kind = (file.extension?.toLowerCase() == 'pdf') ? 'pdf' : 'photo';
+  final suggestion = MediaCategory.suggestion(ownerType: ownerType, kind: kind);
+  // Contexte typé (entretien, devis…) : la nature est évidente, on classe
+  // direct. Onglet Documents du véhicule : ambigu (carte grise / assurance /
+  // photo…), on demande.
+  MediaCategory category;
+  if (_promptsCategory(ownerType)) {
+    if (!context.mounted) return;
+    final picked = await _pickCategory(context, suggestion);
+    if (picked == null) return; // annulé
+    category = picked;
+  } else {
+    category = suggestion;
+  }
+
   try {
     final json = await ref.read(mediaRemoteApiProvider).upload(
           ownerType: ownerType,
           ownerId: ownerId,
           kind: kind,
+          category: category.value,
           fileName: file.name,
           bytes: bytes,
         );
     await ref.read(localRecordStoreProvider).put('media', json);
     await ref.read(syncServiceProvider).syncNow();
-    messenger.showSnackBar(const SnackBar(content: Text('Document ajouté.')));
+    // Surface le tag posé quand il a été déduit sans demander.
+    final msg = _promptsCategory(ownerType)
+        ? 'Document ajouté.'
+        : 'Document ajouté (${category.label}).';
+    messenger.showSnackBar(SnackBar(content: Text(msg)));
   } catch (_) {
     messenger.showSnackBar(
       const SnackBar(content: Text('Upload impossible (serveur kDrive requis).')),
     );
   }
+}
+
+/// Seul l'onglet Documents du véhicule est ambigu et demande la nature ; les
+/// cibles typées (opération, devis, plein) la déduisent (cf. [MediaCategory.suggestion]).
+bool _promptsCategory(String ownerType) => ownerType == 'vehicle';
+
+/// Demande la nature du document (cf. [MediaCategory]) avant l'upload.
+/// Renvoie `null` si l'utilisateur ferme la feuille sans choisir.
+Future<MediaCategory?> _pickCategory(BuildContext context, MediaCategory suggested) {
+  return showModalBottomSheet<MediaCategory>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) {
+      final colors = ctx.appColors;
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Type de document',
+                  style: Theme.of(ctx).textTheme.titleMedium),
+            ),
+            for (final c in MediaCategory.values)
+              ListTile(
+                leading: Icon(c.icon,
+                    color: c == suggested ? colors.accent : colors.textMuted),
+                title: Text(c.label),
+                trailing: c == suggested
+                    ? Icon(Icons.star_rounded, size: 18, color: colors.accent)
+                    : null,
+                onTap: () => Navigator.of(ctx).pop(c),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class DocumentsTab extends ConsumerWidget {
@@ -173,14 +233,18 @@ class _MediaTile extends StatelessWidget {
           border: Border.all(color: colors.outline),
         ),
         clipBehavior: Clip.antiAlias,
-        child: item.isPhoto
-            ? Image.network(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (item.isPhoto)
+              Image.network(
                 url,
                 headers: headers,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => Icon(Icons.broken_image_outlined, color: colors.textMuted),
               )
-            : Column(
+            else
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.picture_as_pdf_outlined, color: colors.textMuted, size: 32),
@@ -196,6 +260,30 @@ class _MediaTile extends StatelessWidget {
                   ),
                 ],
               ),
+            _categoryBadge(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pastille de nature documentaire en haut à gauche ; masquée si non classé.
+  Widget _categoryBadge() {
+    final category = MediaCategory.fromValue(item.category);
+    if (category == MediaCategory.uncategorized) return const SizedBox.shrink();
+    return Positioned(
+      top: 4,
+      left: 4,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Tooltip(
+          message: category.label,
+          child: Icon(category.icon, size: 16, color: Colors.white),
+        ),
       ),
     );
   }

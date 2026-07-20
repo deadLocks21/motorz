@@ -7,6 +7,7 @@ class MediaItem {
   final String ownerType; // vehicle | fuel_entry | maintenance_operation | maintenance_quote
   final UuidValue ownerId;
   final String kind; // photo | pdf
+  final String category; // nature documentaire (cf. MediaCategory) ; défaut uncategorized
   final String? contentType;
   final String? originalFilename;
   final int? fileSize;
@@ -19,6 +20,7 @@ class MediaItem {
     required this.ownerId,
     required this.kind,
     required this.updatedAt,
+    this.category = 'uncategorized',
     this.contentType,
     this.originalFilename,
     this.fileSize,

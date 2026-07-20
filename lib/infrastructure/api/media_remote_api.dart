@@ -15,6 +15,7 @@ class MediaRemoteApi {
     required String ownerType,
     required String ownerId,
     required String kind,
+    required String category,
     required String fileName,
     required Uint8List bytes,
   }) async {
@@ -22,6 +23,7 @@ class MediaRemoteApi {
       'owner_type': ownerType,
       'owner_id': ownerId,
       'kind': kind,
+      'category': category,
       'file': MultipartFile.fromBytes(bytes, filename: fileName),
     });
     try {
@@ -29,6 +31,7 @@ class MediaRemoteApi {
       _logger?.info('media.upload.completed', attrs: {
         'media.owner_type': ownerType,
         'media.kind': kind,
+        'media.category': category,
         'media.bytes': bytes.length,
       });
       return res.data!;
