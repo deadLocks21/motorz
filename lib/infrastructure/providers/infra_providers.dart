@@ -84,13 +84,20 @@ Stream<bool> connectivityStatus(Ref ref) => ref.watch(connectivityServiceProvide
 
 @Riverpod(keepAlive: true)
 SessionRepository sessionRepository(Ref ref) {
-  // Web : pas d'accès disque fiable, la session reste en mémoire (jetable).
-  // Mobile/desktop, y compris en mode démo (memory) : persistance locale via
-  // `shared_preferences` (stockage non chiffré — cf.
-  // SharedPreferencesSessionRepository) pour survivre aux hot restart. En démo
-  // le JWT est factice et l'identité (cf. InMemoryAuthRepository._demoUserId)
-  // est déterministe, donc la session persistée reste cohérente avec le seed.
-  if (kIsWeb) return InMemorySessionRepository();
+  // Persistance locale via `shared_preferences` sur **toutes** les plateformes,
+  // web inclus (adossé à `localStorage` — stockage non chiffré, cf.
+  // SharedPreferencesSessionRepository) : elle permet de survivre aux hot
+  // restart sur mobile/desktop, et au rechargement de page sur web (sans quoi
+  // le web imposerait un login à chaque visite).
+  //
+  // Sur web, le store local et le curseur de sync restent eux en mémoire (cf.
+  // `syncCursor` plus bas et les overrides sqflite de `main()`) : l'état métier
+  // est donc simplement re-synchronisé depuis le serveur une fois la session
+  // restaurée, curseur nul = pull complet.
+  //
+  // En démo (memory) le JWT est factice et l'identité (cf.
+  // InMemoryAuthRepository._demoUserId) est déterministe, donc la session
+  // persistée reste cohérente avec le seed.
   return SharedPreferencesSessionRepository();
 }
 
