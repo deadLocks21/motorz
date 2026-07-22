@@ -248,15 +248,15 @@ final class KnownStationsProvider
 String _$knownStationsHash() => r'7fe2e1b695f2d19d324e760df8f014c60af2874d';
 
 /// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
-/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
-/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+/// champ « Prestataire » d'une opération d'entretien **et d'un devis** (on revient
+/// souvent au même garage quel que soit le véhicule). Voir [rankProviders].
 
 @ProviderFor(knownProviders)
 final knownProvidersProvider = KnownProvidersProvider._();
 
 /// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
-/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
-/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+/// champ « Prestataire » d'une opération d'entretien **et d'un devis** (on revient
+/// souvent au même garage quel que soit le véhicule). Voir [rankProviders].
 
 final class KnownProvidersProvider
     extends
@@ -267,8 +267,8 @@ final class KnownProvidersProvider
         >
     with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
   /// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
-  /// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
-  /// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+  /// champ « Prestataire » d'une opération d'entretien **et d'un devis** (on revient
+  /// souvent au même garage quel que soit le véhicule). Voir [rankProviders].
   KnownProvidersProvider._()
     : super(
         from: null,
@@ -295,7 +295,7 @@ final class KnownProvidersProvider
   }
 }
 
-String _$knownProvidersHash() => r'f07e3acec864aadec7259bf9e068e7177ebec151';
+String _$knownProvidersHash() => r'7274d876ef4d5e009009345bb4b596e204b453b5';
 
 /// Intitulés des échéances « À prévoir » du véhicule — pour l'autocomplétion du
 /// champ « Pièce » d'une ligne d'entretien. Saisir une ligne au même intitulé

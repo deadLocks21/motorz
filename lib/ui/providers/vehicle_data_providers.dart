@@ -109,36 +109,50 @@ List<String> rankStations(List<FuelEntry> entries) {
 }
 
 /// Prestataires déjà saisis, tous véhicules confondus — pour l'autocomplétion du
-/// champ « Prestataire » d'une opération d'entretien (on revient souvent au même
-/// garage quel que soit le véhicule). Voir [rankProviders] pour l'ordre.
+/// champ « Prestataire » d'une opération d'entretien **et d'un devis** (on revient
+/// souvent au même garage quel que soit le véhicule). Voir [rankProviders].
 @riverpod
 Future<List<String>> knownProviders(Ref ref) async {
   ref.watch(storeChangesProvider);
-  return rankProviders(await ref.watch(operationRepositoryProvider).listAll());
+  return rankProviders(
+    await ref.watch(operationRepositoryProvider).listAll(),
+    quotes: await ref.watch(maintenanceQuoteRepositoryProvider).listAll(),
+  );
 }
 
-/// Ordonne pour l'autocomplétion **tous** les prestataires connus de [operations]
-/// (pas seulement les récents) par nombre d'occurrences sur les **10 dernières
-/// opérations** (les garages habituels du moment remontent), puis par fréquence
-/// globale et enfin alphabétiquement pour départager. Dédoublonnage sans tenir
-/// compte de la casse (« Norauto » / « norauto »), l'orthographe affichée étant
-/// la première vue. Calque de [rankStations] ; la date d'une opération n'étant
-/// jamais nulle, le tri par récence est direct.
+/// Ordonne pour l'autocomplétion **tous** les prestataires connus (pas seulement
+/// les récents) par nombre d'occurrences sur les **10 dernières saisies** (les
+/// garages habituels du moment remontent), puis par fréquence globale et enfin
+/// alphabétiquement pour départager. Dédoublonnage sans tenir compte de la casse
+/// (« Norauto » / « norauto »), l'orthographe affichée étant la première vue.
+/// Calque de [rankStations].
+///
+/// Les [quotes] comptent au même titre que les [operations] : qui fait tout
+/// lui-même n'a que des opérations sans prestataire, et sans cela le champ d'un
+/// devis ne proposerait jamais rien.
 @visibleForTesting
-List<String> rankProviders(List<Operation> operations) {
-  // 10 dernières opérations par date décroissante.
-  final byRecency = [...operations]..sort((a, b) => b.date.compareTo(a.date));
-  final recent = <String, int>{}; // occurrences sur les 10 dernières opérations
-  for (final o in byRecency.take(10)) {
-    final key = o.provider?.trim().toLowerCase();
+List<String> rankProviders(
+  List<Operation> operations, {
+  List<MaintenanceQuote> quotes = const [],
+}) {
+  final entries = <({String? provider, DateTime date})>[
+    for (final o in operations) (provider: o.provider, date: o.date),
+    for (final q in quotes) (provider: q.provider, date: q.createdAt),
+  ];
+
+  // 10 dernières saisies par date décroissante.
+  final byRecency = [...entries]..sort((a, b) => b.date.compareTo(a.date));
+  final recent = <String, int>{}; // occurrences sur les 10 dernières saisies
+  for (final e in byRecency.take(10)) {
+    final key = e.provider?.trim().toLowerCase();
     if (key == null || key.isEmpty) continue;
     recent.update(key, (n) => n + 1, ifAbsent: () => 1);
   }
 
   final total = <String, int>{}; // fréquence globale (départage)
   final labels = <String, String>{}; // clé normalisée → orthographe affichée
-  for (final o in operations) {
-    final raw = o.provider?.trim();
+  for (final e in entries) {
+    final raw = e.provider?.trim();
     if (raw == null || raw.isEmpty) continue;
     final key = raw.toLowerCase();
     total.update(key, (n) => n + 1, ifAbsent: () => 1);

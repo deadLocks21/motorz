@@ -131,11 +131,22 @@ class DocumentsTab extends ConsumerWidget {
 
 /// Grille de documents (photos/PDF) d'une cible polymorphe ([ownerType]/[ownerId]) :
 /// bouton d'ajout + vignettes + suppression. Réutilisée pour le véhicule (onglet
-/// Docs) et pour une opération d'entretien (factures).
+/// Docs), une opération d'entretien (factures) et un devis.
 class MediaGrid extends ConsumerWidget {
-  const MediaGrid({super.key, required this.ownerType, required this.ownerId});
+  const MediaGrid({
+    super.key,
+    required this.ownerType,
+    required this.ownerId,
+    this.beforeUpload,
+  });
   final String ownerType;
   final String ownerId;
+
+  /// Hameçon exécuté avant l'ouverture du sélecteur de fichier : l'API rattache
+  /// le média à une ligne **existante**, donc une cible encore en cours de
+  /// saisie (un devis dans sa feuille) doit d'abord s'enregistrer. Renvoyer
+  /// faux annule l'ajout (saisie incomplète).
+  final Future<bool> Function()? beforeUpload;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -151,7 +162,11 @@ class MediaGrid extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OutlinedButton.icon(
-          onPressed: () => uploadDocument(context, ref, ownerType: ownerType, ownerId: ownerId),
+          onPressed: () async {
+            if (beforeUpload != null && !await beforeUpload!()) return;
+            if (!context.mounted) return;
+            await uploadDocument(context, ref, ownerType: ownerType, ownerId: ownerId);
+          },
           icon: const Icon(Icons.upload_file),
           label: const Text('Ajouter un document'),
         ),

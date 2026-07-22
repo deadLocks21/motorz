@@ -131,7 +131,7 @@ final operationCodec = SyncCodec<Operation>(
     title: m['title'] as String?,
     provider: m['provider'] as String?,
     note: m['note'] as String?,
-    countQuoteInEstimate: (m['count_quote_in_estimate'] as bool?) ?? true,
+    isDiy: (m['is_diy'] as bool?) ?? false,
     updatedAt: parseDate(m['updated_at']),
     deletedAt: parseDateOrNull(m['deleted_at']),
   ),
@@ -144,7 +144,7 @@ final operationCodec = SyncCodec<Operation>(
     'title': e.title,
     'provider': e.provider,
     'note': e.note,
-    'count_quote_in_estimate': e.countQuoteInEstimate,
+    'is_diy': e.isDiy,
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },
@@ -223,20 +223,26 @@ final maintenanceQuoteCodec = SyncCodec<MaintenanceQuote>(
   fromJson: (m) => MaintenanceQuote(
     id: _id(m['id']),
     operationId: _id(m['operation_id']),
-    source: m['source'] as String?,
+    provider: m['provider'] as String?,
     amount: doubleOrNull(m['amount']),
     isSelected: (m['is_selected'] as bool?) ?? false,
     notes: m['notes'] as String?,
+    // Repli sur `updated_at` pour les devis saisis avant que la date de
+    // création ne soit conservée localement (l'ordre reste plausible).
+    createdAt: parseDateOrNull(m['created_at']) ?? parseDate(m['updated_at']),
     updatedAt: parseDate(m['updated_at']),
     deletedAt: parseDateOrNull(m['deleted_at']),
   ),
   toJson: (e) => {
     'id': e.id.value,
     'operation_id': e.operationId.value,
-    'source': e.source,
+    'provider': e.provider,
     'amount': e.amount,
     'is_selected': e.isSelected,
     'notes': e.notes,
+    // Seule ressource à pousser sa date de création : elle porte l'ordre des
+    // devis d'une opération (le premier saisi fait référence par défaut).
+    'created_at': isoOrNull(e.createdAt),
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },

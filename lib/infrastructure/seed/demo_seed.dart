@@ -5,6 +5,7 @@ import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/maintenance_plan.dart';
+import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/tire.dart';
 import 'package:motorz/core/domain/model/tire_mount.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
@@ -51,6 +52,9 @@ class DemoSeed {
     }
     for (final l in _lines()) {
       await _put(operationLineCodec, l);
+    }
+    for (final q in _quotes()) {
+      await _put(maintenanceQuoteCodec, q);
     }
     for (final p in _plans(vehicleId)) {
       await _put(planCodec, p);
@@ -124,9 +128,12 @@ class DemoSeed {
 
   static final _seedAt = DateTime.utc(2026, 5, 20, 9);
 
-  /// Trois opérations (en-têtes), cohérentes en date/km avec les pleins.
+  /// Quatre opérations (en-têtes), cohérentes en date/km avec les pleins. La
+  /// dernière est faite par le propriétaire lui-même et porte des devis, pour
+  /// que l'estimatif « tout en garage » et les économies aient de quoi parler.
   List<Operation> _operations(UuidValue vehicleId) {
-    Operation o(String suffix, DateTime date, int odometer, String provider, String note) =>
+    Operation o(String suffix, DateTime date, int odometer, String? provider, String note,
+            {bool isDiy = false}) =>
         Operation(
           id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e$suffix'),
           vehicleId: vehicleId,
@@ -134,6 +141,7 @@ class DemoSeed {
           odometer: odometer,
           provider: provider,
           note: note,
+          isDiy: isDiy,
           updatedAt: date,
         );
 
@@ -144,6 +152,9 @@ class DemoSeed {
           'Plaquettes avant remplacées (usure liée à une conduite sportive).'),
       o('0003', DateTime.utc(2025, 11, 5), 10400, 'Euromaster',
           '2× Michelin Pilot Sport 4S 255/40 R19, équilibrage et parallélisme.'),
+      o('0004', DateTime.utc(2026, 3, 7), 11800, null,
+          'Filtre à air et bougies changés au garage, un dimanche matin.',
+          isDiy: true),
     ];
   }
 
@@ -170,6 +181,30 @@ class DemoSeed {
       // Op3 : pneus + une ligne libre (570 €).
       line('0004', '0003', 'Pneumatiques', parts: 460, labor: 80),
       line('0005', '0003', 'Géométrie / parallélisme', labor: 30),
+      // Op4 : faite soi-même, pièces seules (85 €) — à comparer aux devis.
+      line('0006', '0004', 'Filtre à air', parts: 25),
+      line('0007', '0004', 'Bougies', parts: 60),
+    ];
+  }
+
+  /// Devis de l'opération faite soi-même : deux garages consultés, c'est le
+  /// moins cher qui fait référence (85 € dépensés contre 210 € au garage).
+  List<MaintenanceQuote> _quotes() {
+    MaintenanceQuote quote(String suffix, String provider, double amount, DateTime createdAt,
+            {bool isSelected = false}) =>
+        MaintenanceQuote(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000c$suffix'),
+          operationId: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e0004'),
+          provider: provider,
+          amount: amount,
+          isSelected: isSelected,
+          createdAt: createdAt,
+          updatedAt: _seedAt,
+        );
+
+    return [
+      quote('0001', 'Ford Store Paris 15', 280, DateTime.utc(2026, 3, 2)),
+      quote('0002', 'Speedy', 210, DateTime.utc(2026, 3, 3), isSelected: true),
     ];
   }
 

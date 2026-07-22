@@ -89,10 +89,12 @@ class _TcoCard extends StatelessWidget {
           if (tco.costPerKm != null) _line('Coût au km', formatEur(tco.costPerKm)),
           if (tco.monthlyCost != null) _line('Coût mensuel', formatEur(tco.monthlyCost)),
           if (tco.kmSinceAcquisition != null) _line('Km depuis l\'achat', formatKm(tco.kmSinceAcquisition)),
-          if (tco.garageEstimate > 0) ...[
+          // Sans devis, l'estimatif ne ferait que répéter le coût d'entretien.
+          if (tco.quotedOperationCount > 0) ...[
             const Divider(),
             _line('Estimatif tout-en-garage', formatEur(tco.garageEstimate)),
-            _line('Économies DIY', formatEur(tco.diySavings), highlight: tco.diySavings > 0),
+            _line('Économisé en le faisant moi-même', formatEur(tco.diySavings),
+                highlight: tco.diySavings > 0),
           ],
         ],
       ),

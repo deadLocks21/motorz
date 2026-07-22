@@ -86,6 +86,10 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   final _providerFocus = FocusNode();
   late final TextEditingController _note;
   late DateTime _date;
+
+  /// Fait par moi-même. Par défaut à la création : c'est le cas courant ici, et
+  /// c'est ce qui distingue une économie d'un simple changement de garage.
+  late bool _isDiy;
   final List<_LineDraft> _lines = [];
   bool _saving = false;
 
@@ -99,6 +103,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     _title = TextEditingController(text: e?.title ?? '');
     _provider = TextEditingController(text: e?.provider ?? '');
     _note = TextEditingController(text: e?.note ?? '');
+    _isDiy = e?.isDiy ?? true;
     _date = e?.date.toLocal() ?? DateTime.now();
     for (final l in widget.existingLines) {
       _lines.add(_LineDraft(existingId: l.id, label: l.label, parts: l.partsCost, labor: l.laborCost));
@@ -131,6 +136,12 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
           .showSnackBar(const SnackBar(content: Text('Ajoute au moins un poste.')));
       return;
     }
+    final provider = _provider.text.trim();
+    if (!_isDiy && provider.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Indique le prestataire.')));
+      return;
+    }
     setState(() => _saving = true);
     final now = DateTime.now().toUtc();
     final opId = widget.existing?.id ?? UuidValue.generate();
@@ -143,9 +154,10 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
       date: _date.toUtc(),
       odometer: odo,
       title: _title.text.trim().isEmpty ? null : _title.text.trim(),
-      provider: _provider.text.trim().isEmpty ? null : _provider.text.trim(),
+      // « Moi-même » ne se saisit plus en texte libre : c'est le switch qui le dit.
+      provider: _isDiy ? null : provider,
       note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-      countQuoteInEstimate: widget.existing?.countQuoteInEstimate ?? true,
+      isDiy: _isDiy,
       updatedAt: now,
     );
     await ref.read(operationRepositoryProvider).save(op);
@@ -229,8 +241,18 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
                 hintText: 'Laisser vide pour un titre auto',
               ),
             ),
-            const SizedBox(height: 12),
-            _providerField(providers),
+            SwitchListTile(
+              key: const Key('operationDiySwitch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Fait par moi-même'),
+              value: _isDiy,
+              onChanged: (v) => setState(() => _isDiy = v),
+            ),
+            // Un prestataire n'a de sens que si ce n'est pas moi qui l'ai faite.
+            if (!_isDiy) ...[
+              const SizedBox(height: 4),
+              _providerField(providers),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _note,
@@ -270,7 +292,8 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
     );
   }
 
-  /// Champ « Prestataire ». Tant qu'aucun prestataire n'a été saisi, simple champ
+  /// Champ « Prestataire », affiché seulement hors DIY et alors **obligatoire**.
+  /// Tant qu'aucun prestataire n'a été saisi, simple champ
   /// texte. Dès qu'on en a, autocomplétion sur les prestataires déjà connus
   /// ([providers]) : la liste s'ouvre au focus (chevron) et se filtre à la frappe,
   /// tout en laissant taper un prestataire inédit. Même contrôleur et même focus
@@ -278,8 +301,7 @@ class _AddOperationSheetState extends ConsumerState<_AddOperationSheet> {
   /// « Station » d'un plein ; ici le champ est en haut de la feuille, la liste
   /// s'ouvre donc vers le bas (défaut).
   Widget _providerField(List<String> providers) {
-    const decoration =
-        InputDecoration(labelText: 'Prestataire', hintText: 'Garage / moi-même');
+    const decoration = InputDecoration(labelText: 'Prestataire', hintText: 'Garage Dupont');
     if (providers.isEmpty) {
       return TextField(
         key: const Key('operationProviderField'),

@@ -4,7 +4,7 @@ import 'package:motorz/core/application/services/maintenance_derivation.service.
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/infrastructure/providers/repository_providers.dart';
-import 'package:motorz/ui/pages/maintenance_detail/widgets/add_quote_sheet.widget.dart';
+import 'package:motorz/ui/pages/maintenance_detail/widgets/quote_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/documents_tab.widget.dart';
 import 'package:motorz/ui/providers/vehicle_data_providers.dart';
@@ -30,12 +30,6 @@ class _MaintenanceOperationDetailPageState
   void initState() {
     super.initState();
     _operation = widget.operation;
-  }
-
-  Future<void> _toggleCount(bool value) async {
-    setState(() =>
-        _operation = _operation.copyWith(countQuoteInEstimate: value, updatedAt: DateTime.now().toUtc()));
-    await ref.read(operationRepositoryProvider).save(_operation);
   }
 
   Future<void> _retain(List<MaintenanceQuote> quotes, MaintenanceQuote target) async {
@@ -87,7 +81,9 @@ class _MaintenanceOperationDetailPageState
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final lines = ref.watch(operationLinesProvider(_operation.id.value)).value ?? const [];
-    final quotes = ref.watch(quotesForOperationProvider(_operation.id.value)).value ?? const [];
+    final quotes = MaintenanceQuote.ordered(
+        ref.watch(quotesForOperationProvider(_operation.id.value)).value ?? const []);
+    final retained = MaintenanceQuote.retainedIn(quotes);
     final total = MaintenanceDerivationService.operationCost(lines);
     final title = _operation.title ?? MaintenanceDerivationService.deriveTitle(lines);
 
@@ -118,7 +114,17 @@ class _MaintenanceOperationDetailPageState
                 children: [
                   Text('${formatDate(_operation.date)} · ${formatKm(_operation.odometer)}',
                       style: TextStyle(color: colors.textMuted)),
-                  if (_operation.provider != null) Text('Prestataire : ${_operation.provider}'),
+                  if (_operation.isDiy)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.handyman_outlined, size: 16, color: colors.textMuted),
+                        const SizedBox(width: 6),
+                        const Text('Fait par moi-même'),
+                      ],
+                    )
+                  else if (_operation.provider != null)
+                    Text('Prestataire : ${_operation.provider}'),
                   if (_operation.note != null) ...[
                     const SizedBox(height: 8),
                     Text(_operation.note!),
@@ -155,57 +161,88 @@ class _MaintenanceOperationDetailPageState
           const SizedBox(height: 8),
           MediaGrid(ownerType: 'maintenance_operation', ownerId: _operation.id.value),
           const SizedBox(height: 20),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Compter le devis retenu dans l\'estimatif'),
-            subtitle: const Text('Alimente l\'estimatif « tout en garage » et les économies DIY.'),
-            value: _operation.countQuoteInEstimate,
-            onChanged: _toggleCount,
-          ),
           const Divider(),
           Row(
             children: [
-              Expanded(child: Text('Devis comparatifs', style: Theme.of(context).textTheme.titleMedium)),
+              Expanded(
+                  child: Text('Devis garage', style: Theme.of(context).textTheme.titleMedium)),
               TextButton.icon(
-                onPressed: () => showAddQuoteSheet(context, ref, operationId: _operation.id.value),
+                key: const Key('addQuoteButton'),
+                onPressed: () => showQuoteSheet(context, ref, operationId: _operation.id.value),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Devis'),
               ),
             ],
           ),
           if (quotes.isEmpty)
-            Text('Aucun devis. Ajoute le tarif d\'un garage pour comparer.',
-                style: TextStyle(color: colors.textMuted))
-          else
-            ...quotes.map((q) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(q.source ?? 'Devis'),
-                  subtitle: Text(formatEur(q.amount)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (q.isSelected)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: colors.accentSoft,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text('Retenu',
-                              style: TextStyle(
-                                  color: colors.onAccentSoft, fontWeight: FontWeight.w700, fontSize: 12)),
-                        )
-                      else
-                        TextButton(onPressed: () => _retain(quotes, q), child: const Text('Retenir')),
-                      IconButton(
-                        icon: Icon(Icons.delete_outline, color: colors.textMuted),
-                        onPressed: () => ref.read(maintenanceQuoteRepositoryProvider).delete(q),
-                      ),
-                    ],
-                  ),
-                )),
+            Text(
+              _operation.isDiy
+                  ? 'Aucun devis. Ajoute ce qu\'un garage t\'aurait pris pour mesurer ce que tu économises.'
+                  : 'Aucun devis. Ajoute le chiffrage d\'un garage pour le comparer.',
+              style: TextStyle(color: colors.textMuted),
+            )
+          else ...[
+            if (quotes.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('Le devis coché fait référence pour l\'estimatif.',
+                    style: TextStyle(color: colors.textMuted, fontSize: 12)),
+              ),
+            RadioGroup<String>(
+              groupValue: retained?.id.value,
+              onChanged: (id) {
+                if (id == null) return;
+                _retain(quotes, quotes.firstWhere((q) => q.id.value == id));
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final q in quotes) _quoteTile(q, quotes, retained, total, colors),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Ligne de devis. Le sélecteur n'apparaît qu'à partir de **deux** devis :
+  /// avec un seul, la question « lequel compte ? » ne se pose pas.
+  Widget _quoteTile(
+    MaintenanceQuote quote,
+    List<MaintenanceQuote> quotes,
+    MaintenanceQuote? retained,
+    double? realCost,
+    AppColors colors,
+  ) {
+    final isRetained = quote.id == retained?.id;
+    final effect = isRetained ? _quoteEffect(quote, realCost) : null;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: quotes.length > 1 ? Radio<String>(value: quote.id.value) : null,
+      title: Text(quote.provider ?? 'Devis'),
+      subtitle: effect == null ? null : Text(effect, style: TextStyle(color: colors.textMuted)),
+      trailing: Text(formatEur(quote.amount),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: isRetained ? colors.textPrimary : colors.textMuted,
+          )),
+      onTap: () => showQuoteSheet(context, ref, operationId: _operation.id.value, existing: quote),
+    );
+  }
+
+  /// Ce que le devis de référence change concrètement — la réponse à « à quoi
+  /// ça sert ? » qu'on ne lisait nulle part avant.
+  String? _quoteEffect(MaintenanceQuote quote, double? realCost) {
+    final amount = quote.amount;
+    if (amount == null) return null;
+    // Hors DIY (ou sans coût réel à comparer), le devis ne dit rien d'une
+    // économie : il ne fait que remplacer le coût réel dans l'estimatif.
+    if (!_operation.isDiy || realCost == null) return 'Compté dans l\'estimatif tout-en-garage';
+    final saved = amount - realCost;
+    if (saved > 0) return 'Économie de ${formatEur(saved)} en le faisant moi-même';
+    if (saved < 0) return '${formatEur(-saved)} de plus qu\'en le confiant au garage';
+    return 'Autant qu\'en le confiant au garage';
   }
 }

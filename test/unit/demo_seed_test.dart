@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/application/sync/entity_codecs.dart';
+import 'package:motorz/core/domain/model/maintenance_quote.dart';
 import 'package:motorz/core/domain/model/uuid_value.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/seed/demo_seed.dart';
@@ -40,9 +41,19 @@ void main() {
     final mounts = (await store.query('tire_mounts')).map(tireMountCodec.fromJson).toList();
 
     expect(fuel, hasLength(8));
-    expect(operations, hasLength(3));
-    expect(lines, hasLength(5));
+    expect(operations, hasLength(4));
+    expect(lines, hasLength(7));
     expect(plans, hasLength(4));
+
+    // La dernière opération est faite soi-même (pas de prestataire) et porte
+    // deux devis, dont le moins cher fait référence.
+    final diy = operations.singleWhere((o) => o.isDiy);
+    expect(diy.provider, isNull);
+    final quotes = (await store.query('maintenance_quotes'))
+        .map(maintenanceQuoteCodec.fromJson)
+        .toList();
+    expect(quotes, hasLength(2));
+    expect(MaintenanceQuote.retainedIn(quotes)!.amount, 210);
     // Jeu été (6 PS4S : 2 AV + 2 AR déposés + 2 AR neufs) + galette + jeu hiver (4).
     expect(tires, hasLength(11));
     expect(mounts, hasLength(7));

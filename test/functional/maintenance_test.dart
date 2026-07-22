@@ -69,10 +69,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Entretien réalisé'), findsOneWidget);
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(0), '20000'); // Km
-    await tester.enterText(fields.at(4), 'Vidange'); // Poste (ligne 0, libellé libre)
-    await tester.enterText(fields.at(5), '90'); // Pièces
+    // Ciblage par libellé plutôt que par position : la feuille masque le champ
+    // « Prestataire » tant que l'opération est faite par soi-même.
+    await tester.enterText(find.byKey(const Key('operationOdometerField')), '20000');
+    await tester.enterText(find.widgetWithText(TextField, 'Pièce'), 'Vidange');
+    await tester.enterText(find.widgetWithText(TextField, 'Prix'), '90');
     final saveBtn = find.widgetWithText(FilledButton, 'Enregistrer l\'opération');
     await tester.ensureVisible(saveBtn);
     await tester.pumpAndSettle();

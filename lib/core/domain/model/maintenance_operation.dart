@@ -10,9 +10,14 @@ class Operation {
   final DateTime date;
   final int odometer;
   final String? title;
+
+  /// Garage. **Nul quand [isDiy]** : « moi-même » ne se saisit pas en texte libre.
   final String? provider;
   final String? note;
-  final bool countQuoteInEstimate;
+
+  /// Opération faite par moi-même. Seules celles-ci alimentent les économies
+  /// DIY (ce que j'ai évité de payer à un garage, cf. `FinanceService`).
+  final bool isDiy;
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
@@ -26,7 +31,7 @@ class Operation {
     this.title,
     this.provider,
     this.note,
-    this.countQuoteInEstimate = true,
+    this.isDiy = false,
     this.deletedAt,
   });
 
@@ -36,7 +41,7 @@ class Operation {
     String? title,
     String? provider,
     String? note,
-    bool? countQuoteInEstimate,
+    bool? isDiy,
     DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
@@ -49,7 +54,7 @@ class Operation {
       title: title ?? this.title,
       provider: provider ?? this.provider,
       note: note ?? this.note,
-      countQuoteInEstimate: countQuoteInEstimate ?? this.countQuoteInEstimate,
+      isDiy: isDiy ?? this.isDiy,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

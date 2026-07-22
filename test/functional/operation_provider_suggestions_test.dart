@@ -80,6 +80,9 @@ void main() {
     await tester.tap(find.byKey(const Key('detailFab')));
     await tester.pumpAndSettle();
     expect(find.text('Entretien réalisé'), findsOneWidget);
+    // Le champ n'existe que hors DIY, et « Fait par moi-même » est actif par défaut.
+    await tester.tap(find.byKey(const Key('operationDiySwitch')));
+    await tester.pumpAndSettle();
   }
 
   /// Renseigne le km et un poste pour qu'une opération soit enregistrable.
@@ -155,5 +158,37 @@ void main() {
     final rows = await store.query('maintenance_operations');
     final added = rows.firstWhere((r) => (r['odometer'] as num?)?.toInt() == 123456);
     expect(added['provider'], 'Feu Vert');
+  });
+
+  testWidgets('« Fait par moi-même » masque le prestataire et marque l\'opération DIY',
+      (tester) async {
+    final (store, vehicleId) = await seed();
+    await openNewOperationSheet(tester, store, vehicleId);
+
+    // openNewOperationSheet a désactivé le DIY pour révéler le champ : on le
+    // remet, le champ disparaît et rien ne reste à saisir côté prestataire.
+    await tester.tap(find.byKey(const Key('operationDiySwitch')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('operationProviderField')), findsNothing);
+
+    await fillRequiredFields(tester, km: '123456');
+    await tapSave(tester);
+
+    final rows = await store.query('maintenance_operations');
+    final added = rows.firstWhere((r) => (r['odometer'] as num?)?.toInt() == 123456);
+    expect(added['is_diy'], isTrue);
+    expect(added['provider'], isNull);
+  });
+
+  testWidgets('hors DIY, le prestataire est obligatoire', (tester) async {
+    final (store, vehicleId) = await seed();
+    await openNewOperationSheet(tester, store, vehicleId); // DIY désactivé
+
+    await fillRequiredFields(tester, km: '123456');
+    await tapSave(tester);
+
+    expect(find.text('Indique le prestataire.'), findsOneWidget);
+    final rows = await store.query('maintenance_operations');
+    expect(rows.where((r) => (r['odometer'] as num?)?.toInt() == 123456), isEmpty);
   });
 }

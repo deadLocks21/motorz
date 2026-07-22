@@ -18,8 +18,17 @@ class TcoSummary {
   final int? kmSinceAcquisition;
   final double? costPerKm;
   final double? monthlyCost;
-  final double garageEstimate; // estimatif « tout en garage »
-  final double diySavings; // économies DIY
+  /// Estimatif « tout en garage » : ce que l'entretien aurait coûté si tout
+  /// avait été confié à un garage.
+  final double garageEstimate;
+
+  /// Économies DIY : sur les seules opérations **faites moi-même**, l'écart
+  /// entre le devis retenu et ce que j'ai réellement dépensé.
+  final double diySavings;
+
+  /// Nombre d'opérations portant un devis chiffré. À zéro, l'estimatif ne dit
+  /// rien de plus que le coût réel — l'UI masque le bloc.
+  final int quotedOperationCount;
 
   const TcoSummary({
     required this.fuelCost,
@@ -28,6 +37,7 @@ class TcoSummary {
     required this.tco,
     required this.garageEstimate,
     required this.diySavings,
+    required this.quotedOperationCount,
     this.purchasePrice,
     this.acquiredDate,
     this.acquiredOdometer,
@@ -92,18 +102,30 @@ abstract final class FinanceService {
       if (months >= 0.5) monthlyCost = tco / months;
     }
 
-    // Estimatif « tout en garage » : devis retenu (si compté) sinon coût réel.
-    final selectedByOp = <String, MaintenanceQuote>{};
+    // Un devis suffit à faire foi : saisi = compté. Le devis de référence d'une
+    // opération est celui retenu, à défaut le premier saisi (cf. [retainedIn]).
+    final quotesByOp = <String, List<MaintenanceQuote>>{};
     for (final q in quotes) {
-      if (q.isSelected && q.amount != null) selectedByOp[q.operationId.value] = q;
+      (quotesByOp[q.operationId.value] ??= []).add(q);
     }
+    double? quotedAmount(Operation o) =>
+        MaintenanceQuote.retainedIn(quotesByOp[o.id.value] ?? const [])?.amount;
+
+    // Estimatif « tout en garage » : devis de référence quand il y en a un,
+    // sinon le coût réel (une opération déjà faite en garage est à son prix).
     double garageEstimate = 0;
-    double realTotal = 0;
+    double diySavings = 0;
+    var quotedOperationCount = 0;
     for (final e in opsList) {
       final real = opCost(e);
-      realTotal += real;
-      final q = selectedByOp[e.id.value];
-      garageEstimate += (q != null && e.countQuoteInEstimate) ? q.amount! : real;
+      final quoted = quotedAmount(e);
+      garageEstimate += quoted ?? real;
+      if (quoted == null) continue;
+      quotedOperationCount++;
+      // Ce que j'ai évité de payer n'a de sens que si c'est moi qui ai mis les
+      // mains dedans : sur une opération confiée à un garage, l'écart avec un
+      // devis concurrent n'est pas une économie réalisée.
+      if (e.isDiy) diySavings += quoted - real;
     }
 
     return TcoSummary(
@@ -118,7 +140,8 @@ abstract final class FinanceService {
       costPerKm: costPerKm,
       monthlyCost: monthlyCost,
       garageEstimate: garageEstimate,
-      diySavings: garageEstimate - realTotal,
+      diySavings: diySavings,
+      quotedOperationCount: quotedOperationCount,
     );
   }
 }
