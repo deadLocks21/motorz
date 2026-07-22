@@ -133,6 +133,8 @@ const _fieldLabels = {
   'volume_liters': 'Volume',
   'price_per_liter': 'Prix au litre',
   'total_cost': 'Coût total',
+  'recurrence': 'Périodicité',
+  'end_date': 'Fin',
   'station': 'Station',
   'notes': 'Notes',
   'note': 'Note',

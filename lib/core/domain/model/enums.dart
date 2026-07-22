@@ -50,6 +50,53 @@ enum TaskPriority {
 /// État d'échéance calculé localement (cf. indicateurs in-app).
 enum DueStatus { upcoming, dueSoon, overdue }
 
+/// Périodicité d'un poste de coût. `ponctuel` = un paiement daté (une révision,
+/// une franchise). Les autres décrivent une charge **perpétuelle** saisie une
+/// seule fois — « l'assurance, c'est 800 € par an » — que le TCO étale au
+/// prorata du temps de possession plutôt que d'attendre une ligne par échéance.
+enum CostRecurrence {
+  ponctuel,
+  mensuel,
+  trimestriel,
+  semestriel,
+  annuel;
+
+  String get wire => name;
+
+  /// Repli sur `ponctuel` : c'est la valeur des frais saisis avant ce champ.
+  static CostRecurrence fromWire(String? w) =>
+      CostRecurrence.values.where((e) => e.name == w).firstOrNull ?? CostRecurrence.ponctuel;
+
+  bool get isRecurring => this != CostRecurrence.ponctuel;
+
+  /// Nombre de mois couverts par un versement. Zéro pour `ponctuel` : un
+  /// paiement unique ne couvre aucune période, il ne s'étale pas.
+  int get months => switch (this) {
+    CostRecurrence.ponctuel => 0,
+    CostRecurrence.mensuel => 1,
+    CostRecurrence.trimestriel => 3,
+    CostRecurrence.semestriel => 6,
+    CostRecurrence.annuel => 12,
+  };
+
+  String get label => switch (this) {
+    CostRecurrence.ponctuel => 'Ponctuel',
+    CostRecurrence.mensuel => 'Par mois',
+    CostRecurrence.trimestriel => 'Par trimestre',
+    CostRecurrence.semestriel => 'Par semestre',
+    CostRecurrence.annuel => 'Par an',
+  };
+
+  /// Suffixe court accolé au montant (« 800 € /an »).
+  String get suffix => switch (this) {
+    CostRecurrence.ponctuel => '',
+    CostRecurrence.mensuel => '/mois',
+    CostRecurrence.trimestriel => '/trimestre',
+    CostRecurrence.semestriel => '/semestre',
+    CostRecurrence.annuel => '/an',
+  };
+}
+
 /// État d'un pneu à l'achat. Requis (défaut : neuf).
 enum TireCondition {
   neuf,
