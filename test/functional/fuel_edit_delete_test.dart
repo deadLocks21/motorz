@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,21 +80,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('appui long → Modifier rouvre la feuille pré-remplie et met à jour le plein',
+  testWidgets('taper une ligne rouvre la feuille pré-remplie et met à jour le plein',
       (tester) async {
     final (store, vehicleId) = await seed();
     await pumpFuelTab(tester, store, vehicleId);
 
     expect(find.text(fuelRow), findsOneWidget);
 
-    // Appui long → menu contextuel modifier / supprimer.
-    await tester.longPress(find.text(fuelRow));
-    await tester.pumpAndSettle();
-    expect(find.text('Modifier'), findsOneWidget);
-    expect(find.text('Supprimer'), findsOneWidget);
-
-    // Modifier → la feuille se rouvre pré-remplie.
-    await tester.tap(find.text('Modifier'));
+    // Tap → la feuille se rouvre pré-remplie (interaction uniformisée des
+    // listes : la tuile édite, la suppression vit dans la feuille).
+    await tester.tap(find.text(fuelRow));
     await tester.pumpAndSettle();
     expect(find.text('Modifier le plein'), findsOneWidget);
     final odoField = tester.widget<TextField>(find.byKey(const Key('fuelOdometerField')));
@@ -168,13 +162,44 @@ void main() {
     expect((await store.query('fuel_entries')).length, 1, reason: 'aucun plein ajouté');
   });
 
-  testWidgets('clic droit → Supprimer demande confirmation puis retire le plein', (tester) async {
+  testWidgets('« un plein manque avant celui-ci » se pose en édition et se persiste',
+      (tester) async {
     final (store, vehicleId) = await seed();
     await pumpFuelTab(tester, store, vehicleId);
 
-    // Clic droit (desktop) → même menu contextuel.
-    await tester.tap(find.text(fuelRow), buttons: kSecondaryButton);
+    // Absent du chemin de saisie : un plein manqué se découvre après coup.
+    await tester.tap(find.byKey(const Key('detailFab')));
     await tester.pumpAndSettle();
+    expect(find.text('Nouveau plein'), findsOneWidget);
+    expect(find.byKey(const Key('fuelMissedFillSwitch')), findsNothing);
+    Navigator.of(tester.element(find.text('Nouveau plein'))).pop();
+    await tester.pumpAndSettle();
+
+    // Présent en édition, et enregistré sur l'entrée.
+    await tester.tap(find.text(fuelRow));
+    await tester.pumpAndSettle();
+    final switchFinder = find.byKey(const Key('fuelMissedFillSwitch'));
+    await tester.ensureVisible(switchFinder);
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('saveFuelButton')));
+    await tester.tap(find.byKey(const Key('saveFuelButton')));
+    await tester.pumpAndSettle();
+
+    final rows = await store.query('fuel_entries');
+    expect(rows.length, 1);
+    expect(rows.first['missed_fill_before'], true);
+  });
+
+  testWidgets('Supprimer, dans la feuille, demande confirmation puis retire le plein',
+      (tester) async {
+    final (store, vehicleId) = await seed();
+    await pumpFuelTab(tester, store, vehicleId);
+
+    await tester.tap(find.text(fuelRow));
+    await tester.pumpAndSettle();
+    // La feuille défile : le bouton du bas n'est pas forcément à l'écran.
+    await tester.ensureVisible(find.text('Supprimer'));
     await tester.tap(find.text('Supprimer'));
     await tester.pumpAndSettle();
 
