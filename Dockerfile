@@ -14,9 +14,10 @@ ARG FLUTTER_VERSION=3.41.7
 FROM ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION} AS build
 WORKDIR /src
 
-# Figés à la compilation (`--dart-define` + `--base-href`) : l'image est donc
-# liée à un environnement. Surchargeables via --build-arg.
-ARG API_BASE_URL=https://motorz.dtfh.fr/api
+# Chemin de montage, figé à la compilation (`--base-href`). L'URL de l'API,
+# elle, n'est **pas** dans l'image : sur web le client la dérive de l'origine
+# qui le sert (cf. `ApiBaseUrl`), donc cette image fonctionne sur n'importe
+# quel domaine.
 ARG BASE_HREF=/
 
 # Alignés sur les builds store (cf. .github/workflows/release.yml) : même
@@ -46,7 +47,6 @@ RUN set -eu; \
     flutter build web --release \
       --base-href="${BASE_HREF}" \
       ${EXTRA} \
-      --dart-define=API_BASE_URL="${API_BASE_URL}" \
       --dart-define=SIGNOZ_INGEST_URL="${SIGNOZ_INGEST_URL}" \
       --dart-define=SIGNOZ_INGESTION_KEY="${SIGNOZ_INGESTION_KEY}" \
       --dart-define=SIGNOZ_ENV="${SIGNOZ_ENV}" \

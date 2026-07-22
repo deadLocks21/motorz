@@ -8,14 +8,17 @@ part of 'infra_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// URL de l'API configurable au runtime (réglages) avec fallback `--dart-define`.
+/// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
+/// (réglages) avec fallback `--dart-define` sur les autres plateformes.
 
 @ProviderFor(ApiBaseUrl)
 final apiBaseUrlProvider = ApiBaseUrlProvider._();
 
-/// URL de l'API configurable au runtime (réglages) avec fallback `--dart-define`.
+/// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
+/// (réglages) avec fallback `--dart-define` sur les autres plateformes.
 final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
-  /// URL de l'API configurable au runtime (réglages) avec fallback `--dart-define`.
+  /// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
+  /// (réglages) avec fallback `--dart-define` sur les autres plateformes.
   ApiBaseUrlProvider._()
     : super(
         from: null,
@@ -43,9 +46,10 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
   }
 }
 
-String _$apiBaseUrlHash() => r'8eb48bf6a99ddb2496712efc0a6bdb469aa6fe87';
+String _$apiBaseUrlHash() => r'bcfb3a882284d96d427f0137d51239a2fb4ef28f';
 
-/// URL de l'API configurable au runtime (réglages) avec fallback `--dart-define`.
+/// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
+/// (réglages) avec fallback `--dart-define` sur les autres plateformes.
 
 abstract class _$ApiBaseUrl extends $Notifier<String> {
   String build();
@@ -232,7 +236,7 @@ final class SessionRepositoryProvider
   }
 }
 
-String _$sessionRepositoryHash() => r'b6b8f40d1f7c91a0f5866220d57cdf386f6c4242';
+String _$sessionRepositoryHash() => r'b32fdbe0b6f7135310605e2125750b473fe31201';
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();

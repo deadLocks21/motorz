@@ -31,20 +31,38 @@ bool isMemoryMode(String url) => url == 'memory' || url.isEmpty;
 
 const _envBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'memory');
 
-/// URL de l'API configurable au runtime (réglages) avec fallback `--dart-define`.
+/// Chemin de l'API sur l'hôte qui sert le client web — contrepartie du
+/// StripPrefix Traefik (cf. README, « Déploiement web »).
+const _webApiPath = '/api';
+
+/// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
+/// (réglages) avec fallback `--dart-define` sur les autres plateformes.
 @Riverpod(keepAlive: true)
 class ApiBaseUrl extends _$ApiBaseUrl {
   static const _prefKey = 'motorz.api_base_url';
 
   @override
-  String build() => _envBaseUrl;
+  String build() {
+    // Sur web, l'app et l'API partagent forcément l'origine : le navigateur
+    // bloquerait tout autre hôte, l'API n'exposant aucun middleware CORS. On la
+    // dérive donc de la page servie au lieu de la figer à la compilation — il
+    // n'y a rien à régler, rien à désynchroniser, et l'image du client web
+    // reste valable quel que soit le domaine qui la sert.
+    if (kIsWeb) return '${Uri.base.origin}$_webApiPath';
+    return _envBaseUrl;
+  }
 
   Future<void> load() async {
+    // Garde nécessaire, pas seulement défensive : une version antérieure
+    // exposait le réglage sur web et a pu laisser une URL dans `localStorage`.
+    // Sans ce court-circuit elle écraserait l'origine au démarrage.
+    if (kIsWeb) return;
     final stored = (await SharedPreferences.getInstance()).getString(_prefKey);
     if (stored != null && stored.isNotEmpty) state = stored;
   }
 
   Future<void> update(String url) async {
+    if (kIsWeb) return;
     await (await SharedPreferences.getInstance()).setString(_prefKey, url);
     state = url;
   }

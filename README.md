@@ -22,14 +22,15 @@ Découpage des URL sur l'hôte :
 
 ⚠️ **Le web doit être servi sur le même domaine que l'API**, à un préfixe de chemin près. L'API n'expose aucun middleware CORS : un sous-domaine dédié (`app.motorz.dtfh.fr`) ferait échouer tous les appels réseau côté navigateur.
 
+C'est pourquoi le client web **ne propose pas de choisir son backend** (la roue crantée de l'écran de connexion est masquée) et **ne l'embarque pas non plus** : `ApiBaseUrl` le dérive de l'origine servie, soit `${window.location.origin}/api`. Conséquences utiles — l'image ne contient aucune URL, donc elle tourne telle quelle sur n'importe quel domaine ; il n'y a rien à garder synchronisé entre la config Traefik et un build ; et le mode `memory` est inatteignable sur web, ce qui est cohérent puisque le web est un client en ligne.
+
 ⚠️ Le web étant catch-all avec fallback SPA, **toute URL inconnue renvoie l'app en HTTP 200**, pas une 404. D'où le routeur dédié pour `/privacy-policy` : sans lui, Google recevrait silencieusement l'app à la place de la politique de confidentialité.
 
-Deux valeurs sont **figées à la compilation** dans l'image (donc liée à un environnement), surchargeables en `--build-arg` :
+Une seule valeur est **figée à la compilation** dans l'image :
 
-| Build arg      | Défaut                        | Rôle |
-|----------------|-------------------------------|------|
-| `API_BASE_URL` | `https://motorz.dtfh.fr/api`  | `--dart-define` consommé par `infra_providers.dart`. `dio` préserve le préfixe de chemin. |
-| `BASE_HREF`    | `/`                           | `--base-href` ; doit correspondre au chemin servi par nginx. |
+| Build arg   | Défaut | Rôle |
+|-------------|--------|------|
+| `BASE_HREF` | `/`    | `--base-href` ; doit correspondre au chemin servi par nginx. |
 
 `FLUTTER_VERSION`, `BUILD_NAME` / `BUILD_NUMBER` / `APP_VERSION` et les `SIGNOZ_*` sont également des build args, renseignés par `release.yml` pour coller aux builds store. Laissés vides — cas d'un build local — Flutter retombe sur `version:` de `pubspec.yaml` et l'app sur `ConsoleLoggerService`.
 
@@ -38,6 +39,8 @@ Deux valeurs sont **figées à la compilation** dans l'image (donc liée à un e
 docker build --target runtime -t motorz-web:local .
 docker run --rm -p 8080:80 motorz-web:local
 ```
+
+L'app y visera `http://localhost:8080/api`, qui ne répond pas : la connexion échouera, c'est attendu. Pour un essai complet en local, servir l'app et l'API derrière une même origine (un reverse proxy local) — l'app s'y branche alors sans aucun réglage.
 
 Sur web, seule la **session** est persistée (`shared_preferences` → `localStorage`) ; le store local et le curseur de synchro restent en mémoire (cf. `infra_providers.dart`). Un rechargement de page conserve donc la connexion et re-synchronise l'état depuis le serveur (curseur nul = pull complet).
 

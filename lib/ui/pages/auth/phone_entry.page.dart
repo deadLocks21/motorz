@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -113,16 +114,20 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
                 ),
               ),
             ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                tooltip: 'Configurer le serveur',
-                color: colors.textMuted,
-                onPressed: () => showBackendUrlDialog(context, ref),
+            // Pas de choix de serveur sur web : l'API est nécessairement celle
+            // de l'origine qui sert la page (cf. `ApiBaseUrl`), tout autre
+            // hôte serait bloqué par le navigateur.
+            if (!kIsWeb)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'Configurer le serveur',
+                  color: colors.textMuted,
+                  onPressed: () => showBackendUrlDialog(context, ref),
+                ),
               ),
-            ),
           ],
         ),
       ),
