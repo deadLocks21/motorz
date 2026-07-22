@@ -833,9 +833,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      # Sans filtre, l'action récupère *tout* ce que le run a produit — y compris
+      # le build record `<owner>~<repo>~<id>.dockerbuild` que
+      # docker/build-push-action publie de lui-même, et l'image web (38 Mo de tar
+      # qui ne sont pas un asset de release). La release n'a que faire de ces
+      # deux-là, mais leur téléchargement pouvait la faire échouer : c'est
+      # exactement ce qui s'est produit, le `.dockerbuild` ayant épuisé ses 5
+      # retries. On ne télécharge donc que ce qu'on attache réellement.
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: "motorz-{android,macos,windows,linux,updater-windows,updater-linux}"
           path: artifacts/
 
       - name: Create GitHub Release
