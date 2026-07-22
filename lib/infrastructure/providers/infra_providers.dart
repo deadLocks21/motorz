@@ -11,6 +11,7 @@ import 'package:motorz/infrastructure/auth/dio_auth_repository.dart';
 import 'package:motorz/infrastructure/auth/in_memory_auth_repository.dart';
 import 'package:motorz/infrastructure/connectivity/connectivity_plus.service.dart';
 import 'package:motorz/infrastructure/http/auth_interceptor.dart';
+import 'package:motorz/infrastructure/http/http_log.interceptor.dart';
 import 'package:motorz/infrastructure/providers/logger_providers.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
 import 'package:motorz/infrastructure/session/shared_prefs_session_repository.dart';
@@ -63,8 +64,29 @@ class ApiBaseUrl extends _$ApiBaseUrl {
 
   Future<void> update(String url) async {
     if (kIsWeb) return;
-    await (await SharedPreferences.getInstance()).setString(_prefKey, url);
-    state = url;
+    final normalized = normalize(url);
+    await (await SharedPreferences.getInstance()).setString(_prefKey, normalized);
+    state = normalized;
+  }
+
+  /// Redresse une URL saisie à la main avant de la stocker. Deux fautes de
+  /// frappe suffisaient à produire un « Pas de connexion au serveur »
+  /// indéchiffrable :
+  ///
+  /// - **schéma omis** (`motorz.dtfh.fr`) — Dio construit alors une URI
+  ///   relative sans hôte, et l'appel échoue avant même de sortir de
+  ///   l'appareil ;
+  /// - **slash final** (`https://…/api/`) — collé au chemin de la requête, il
+  ///   donne un `//auth/request-otp` que le routeur serveur ne reconnaît pas.
+  ///
+  /// « memory » (mode local-only) traverse tel quel : ce n'est pas une URL.
+  static String normalize(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty || isMemoryMode(trimmed)) return trimmed;
+    final withScheme = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    return withScheme.endsWith('/')
+        ? withScheme.substring(0, withScheme.length - 1)
+        : withScheme;
   }
 }
 
@@ -86,6 +108,9 @@ Dio dio(Ref ref) {
     // la résoudre ici créerait un cycle.
     onUnauthorized: () => unawaited(ref.read(sessionControllerProvider.notifier).expire()),
   ));
+  // En dernier : il voit ainsi la requête telle qu'elle part réellement (une
+  // fois les en-têtes d'auth posés) et l'erreur telle qu'elle revient.
+  dio.interceptors.add(HttpLogInterceptor(logger: ref.watch(loggerProvider)));
   return dio;
 }
 

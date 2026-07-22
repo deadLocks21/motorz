@@ -207,5 +207,12 @@ Future<void> bootstrap(Ref ref) async {
   if (authenticated) {
     unawaited(sync.syncNow());
   }
-  ref.read(loggerProvider).info('app.bootstrap.completed', attrs: {'authenticated': authenticated});
+  // `api.base_url` est la première chose à vérifier devant un échec réseau
+  // généralisé (auth *et* synchro) : c'est le seul réglage capable de tout
+  // casser d'un coup. Il ne peut pas être loggué à la construction du client
+  // Dio — résoudre le logger depuis ce provider y bouclerait sur la session.
+  ref.read(loggerProvider).info('app.bootstrap.completed', attrs: {
+    'authenticated': authenticated,
+    'api.base_url': ref.read(apiBaseUrlProvider),
+  });
 }

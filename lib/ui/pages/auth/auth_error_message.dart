@@ -7,6 +7,8 @@ String authErrorMessage(AuthErrorCode code) => switch (code) {
   AuthErrorCode.rateLimited => 'Trop de tentatives. Patiente quelques minutes.',
   AuthErrorCode.smsFailed => 'Envoi du SMS impossible. Réessaie plus tard.',
   AuthErrorCode.network => 'Pas de connexion au serveur.',
+  AuthErrorCode.badServerUrl =>
+    'Ce serveur ne répond pas comme l\'API Motorz. Vérifie l\'URL configurée.',
   AuthErrorCode.accountNotFound => 'Aucun compte associé à ce numéro. Contacte l\'administrateur.',
   AuthErrorCode.unknown => 'Une erreur est survenue.',
 };

@@ -6,6 +6,12 @@ enum AuthErrorCode {
   rateLimited,
   smsFailed,
   network,
+
+  /// Le serveur a répondu, mais pas comme l'API : réponse non-JSON (page
+  /// d'erreur, SPA servie en catch-all…). Symptôme d'une URL de backend qui
+  /// vise le bon hôte au mauvais chemin — distinct de [network], où rien n'a
+  /// répondu du tout, et de [unknown], qui ne dit rien à personne.
+  badServerUrl,
   unknown,
 }
 

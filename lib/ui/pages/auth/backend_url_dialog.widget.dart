@@ -55,7 +55,8 @@ class _BackendUrlDialogState extends ConsumerState<_BackendUrlDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'URL de l\'API self-hosted. « memory » = mode local sans serveur.',
+            'URL de l\'API self-hosted, préfixe de chemin compris. '
+            '« memory » = mode local sans serveur.',
             style: TextStyle(color: colors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -66,7 +67,13 @@ class _BackendUrlDialogState extends ConsumerState<_BackendUrlDialog> {
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
               labelText: 'API_BASE_URL',
-              hintText: 'https://motorz.dtfh.fr',
+              // Depuis que le client web occupe l'hôte en catch-all, l'API
+              // n'est plus servie qu'à `/api` (StripPrefix Traefik, cf. README).
+              // Sans ce suffixe, tout part chez nginx : `POST /auth/request-otp`
+              // → 405, `GET /sync/changes` → la SPA en 200 text/html. La
+              // connexion et la synchro échouent alors ensemble, sans que rien
+              // n'indique que c'est le réglage qui est périmé.
+              hintText: 'https://motorz.dtfh.fr/api',
             ),
             onSubmitted: (_) => _save(),
           ),
