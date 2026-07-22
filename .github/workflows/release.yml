@@ -11,15 +11,14 @@
 #      build-windows   .zip autonome du dossier Release (artifact).
 #      build-linux     AppImage x86_64 (artifact).
 #      build-updater   CLI installateur/auto-updater desktop (Win + Linux).
-#      build-web       Image Docker nginx + bundle Flutter web, poussée sur
-#                      Docker Hub en tags immuables (:X.Y.Z, :sha) — l'équivalent
-#                      d'un artifact : publiée mais pas encore servie.
+#      build-web       Image Docker nginx + bundle Flutter web, exportée en tar
+#                      (artifact). Rien n'est poussé sur Docker Hub ici.
 #   3) build-gate      Sentinelle : vérifie que les builds d'app sont verts.
 #   4) publish-android Upload sur le Play Store, piste "internal".
 #      publish-macos   Upload sur TestFlight (les testeurs internes du groupe
 #                      "Motorz Internal" reçoivent le build automatiquement).
-#      publish-web     Promeut l'image en `:latest` et déclenche docker-updater
-#                      (le VPS ne sert la nouvelle version qu'à partir de là).
+#      publish-web     Charge l'artifact, pousse :X.Y.Z / :sha / :latest sur
+#                      Docker Hub, puis déclenche docker-updater.
 #   5) release         Crée la GitHub Release avec l'AAB + l'APK + le .pkg +
 #                      le .zip Windows + l'AppImage + les 2 binaires updater.
 #
@@ -631,23 +630,19 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Connexion à Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build de l'image et publication en tags immuables
-        # Volontairement **pas** de `:latest` ici : tant que le gate n'est pas
-        # vert, l'image existe sur Docker Hub sans être servie. C'est
-        # l'équivalent de l'artifact des autres cibles.
+      - name: Build de l'image (aucune publication)
+        # Exporte un tar au lieu de pousser : comme l'AAB ou le .pkg, l'image
+        # reste un artifact tant que le gate n'est pas vert — rien n'atteint
+        # Docker Hub avant `publish-web`. Corollaire : ce job n'a besoin
+        # d'aucun accès registry, donc il peut entrer dans le gate sans y
+        # importer de dépendance réseau.
         uses: docker/build-push-action@v6
         with:
           context: .
           # `runtime` explicite : la stage `build` embarque le SDK Flutter et
           # pèse plusieurs Go, elle ne doit jamais être publiée.
           target: runtime
-          push: true
+          outputs: type=docker,dest=/tmp/motorz-web.tar
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/motorz-web:${{ needs.prepare.outputs.version }}
             ${{ vars.DOCKERHUB_USERNAME }}/motorz-web:${{ github.sha }}
@@ -665,16 +660,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motorz-web-image
+          path: /tmp/motorz-web.tar
+          retention-days: 14
+          if-no-files-found: error
+
   # ═══════════════════════════════════════════════════════════════════════
   # BUILD GATE — Sentinelle qui valide que les builds sont verts
   # ═══════════════════════════════════════════════════════════════════════
 
   build-gate:
     name: All builds passed
-    # `build-web` n'y figure pas volontairement, au même titre que
-    # `build-updater` : une indisponibilité de Docker Hub ne doit pas bloquer
-    # une publication store. L'inverse est vrai en revanche — cf. publish-web.
-    needs: [build-android, build-macos, build-windows, build-linux]
+    needs: [build-android, build-macos, build-windows, build-linux, build-web]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -770,19 +770,23 @@ jobs:
             --max-find-build-wait 90
 
   publish-web:
-    name: Publish Web to VPS
-    # Dépend du gate : le site ne bascule sur la nouvelle version que si tous
-    # les builds d'app étaient verts — une release reste cohérente d'un canal
-    # à l'autre.
-    needs: [prepare, build-gate, build-web]
+    name: Publish Web to Docker Hub + VPS
+    # Mêmes contraintes que les publications store : rien ne sort avant que le
+    # gate soit vert. C'est ici, et seulement ici, que l'image devient publique.
+    needs: [prepare, build-gate]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     env:
       IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/motorz-web
+      VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
-      - uses: docker/setup-buildx-action@v3
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: motorz-web-image
+          path: /tmp
 
       - name: Connexion à Docker Hub
         uses: docker/login-action@v3
@@ -790,14 +794,16 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Promouvoir l'image de la version en `:latest`
-        # Re-tag côté registry à partir de l'image déjà poussée par build-web :
-        # aucun rebuild, aucun re-push de couches — et surtout le bit à bit
-        # déployé est exactement celui qui a passé le gate.
+      - name: Publier l'image
+        # L'image chargée est exactement celle qu'a produite `build-web` et qui
+        # a passé le gate — aucune recompilation, donc aucune divergence
+        # possible entre ce qui a été validé et ce qui est déployé.
         run: |
-          docker buildx imagetools create \
-            -t "$IMAGE:latest" \
-            "$IMAGE:${{ needs.prepare.outputs.version }}"
+          docker load -i /tmp/motorz-web.tar
+          docker tag "$IMAGE:$VERSION" "$IMAGE:latest"
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
 
       - name: Déclenchement du pull docker-updater
         env:

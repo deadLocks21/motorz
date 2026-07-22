@@ -10,7 +10,9 @@ Conventions reprises de `songbook-app` / `kidflix` : archi **hexagonale layer-fi
 
 Le client web est une **cible à part entière** : bundle Flutter web servi par nginx dans son propre conteneur (`Dockerfile` + `nginx.conf`), publié sur **Docker Hub** puis déployé par webhook docker-updater. Le backend garde sa chaîne GitLab.
 
-Il est buildé **dans le même workflow que les binaires store** (`.github/workflows/release.yml`, déclenché sur tag `v*`), donc à partir du même commit, avec la même version et les mêmes `--dart-define` (Signoz inclus) : une version publiée désigne le même code sur tous les canaux. Jobs `build-web` (tags immuables `:X.Y.Z` et `:sha`) puis `publish-web` (promotion en `:latest` + déploiement), ce dernier conditionné au `build-gate`.
+Il est buildé **dans le même workflow que les binaires store** (`.github/workflows/release.yml`, déclenché sur tag `v*`), donc à partir du même commit, avec la même version et les mêmes `--dart-define` (Signoz inclus) : une version publiée désigne le même code sur tous les canaux.
+
+Il suit aussi le même cycle : `build-web` exporte l'image en tar et la dépose en **artifact** — rien n'atteint Docker Hub à ce stade, exactement comme l'AAB reste privé jusqu'à `publish-android`. Le job est dans le `build-gate` (il n'a aucune dépendance réseau, une erreur de compilation web doit donc bloquer la release au même titre qu'une autre plateforme). `publish-web` recharge cet artifact et pousse `:X.Y.Z`, `:sha` et `:latest`, puis déclenche le déploiement — sous les **mêmes contraintes que les publications store** (`needs: [prepare, build-gate]`). Ce qui est déployé est bit à bit ce qui a passé le gate, sans recompilation.
 
 Découpage des URL sur l'hôte :
 
