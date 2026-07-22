@@ -35,4 +35,33 @@ void main() {
   test('consommation null avec un seul plein', () {
     expect(VehicleStatsService.averageConsumption([fuel(100000, 40)]), isNull);
   });
+
+  FuelEntry dated(DateTime? date, int odo, double? volume) => FuelEntry(
+        id: UuidValue.generate(),
+        vehicleId: vehicleId,
+        date: date,
+        odometer: odo,
+        volumeLiters: volume,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+
+  test('la moyenne est datée du dernier plein qui entre dans le calcul', () {
+    final average = VehicleStatsService.consumptionAverage([
+      dated(DateTime.utc(2026, 1, 10), 100000, 45),
+      dated(DateTime.utc(2026, 2, 14), 100500, 30),
+    ]);
+    expect(average!.value, closeTo(6.0, 0.001));
+    expect(average.asOf, DateTime.utc(2026, 2, 14));
+  });
+
+  test('un plein sans date ne prive pas la moyenne de sa date', () {
+    // Un plein peut n'avoir qu'un kilométrage : on date alors la moyenne sur le
+    // plein daté le plus récent, plutôt que de renoncer à afficher une date.
+    final average = VehicleStatsService.consumptionAverage([
+      dated(DateTime.utc(2026, 1, 10), 100000, 45),
+      dated(DateTime.utc(2026, 2, 14), 100500, 30),
+      dated(null, 100900, 25),
+    ]);
+    expect(average!.asOf, DateTime.utc(2026, 2, 14));
+  });
 }

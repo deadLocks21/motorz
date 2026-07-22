@@ -3,6 +3,9 @@ import 'package:motorz/core/domain/model/fuel_entry.dart';
 /// Point d'une série temporelle (graphes §5.9).
 typedef SeriesPoint = ({DateTime date, double value});
 
+/// Distance parcourue sur un mois donné (`month` est calé au 1er du mois).
+typedef MonthlyDistance = ({DateTime month, int km});
+
 /// Préparation des séries statistiques — pur, calculé localement.
 abstract final class StatsService {
   /// Consommation L/100 km par segment entre pleins consécutifs (volume du
@@ -38,17 +41,27 @@ abstract final class StatsService {
     return out;
   }
 
-  /// Km parcourus par mois (clé `YYYY-MM`) — basé sur la progression du compteur.
-  static Map<String, int> kmPerMonth(List<FuelEntry> fuel) {
+  /// Km parcourus par mois — basé sur la progression du compteur entre pleins.
+  /// Série continue du plus ancien au plus récent : un mois sans plein vaut 0
+  /// (sinon le graphe tasserait une pause de six mois contre le mois suivant),
+  /// tronquée aux [maxMonths] derniers mois pour rester lisible.
+  static List<MonthlyDistance> kmPerMonth(List<FuelEntry> fuel, {int maxMonths = 12}) {
     final f = fuel.where((e) => e.odometer != null && e.date != null).toList()
       ..sort((a, b) => a.odometer!.compareTo(b.odometer!));
-    final out = <String, int>{};
+    final byMonth = <DateTime, int>{};
     for (var i = 1; i < f.length; i++) {
       final dist = f[i].odometer! - f[i - 1].odometer!;
       if (dist <= 0) continue;
-      final key = '${f[i].date!.year}-${f[i].date!.month.toString().padLeft(2, '0')}';
-      out[key] = (out[key] ?? 0) + dist;
+      final d = f[i].date!.toLocal();
+      final key = DateTime(d.year, d.month);
+      byMonth[key] = (byMonth[key] ?? 0) + dist;
     }
-    return out;
+    if (byMonth.isEmpty) return const [];
+    final months = byMonth.keys.toList()..sort();
+    final out = <MonthlyDistance>[];
+    for (var m = months.first; !m.isAfter(months.last); m = DateTime(m.year, m.month + 1)) {
+      out.add((month: m, km: byMonth[m] ?? 0));
+    }
+    return out.length <= maxMonths ? out : out.sublist(out.length - maxMonths);
   }
 }
