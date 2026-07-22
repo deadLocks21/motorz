@@ -8,6 +8,7 @@ enum MediaCategory {
   registration('registration', 'Carte grise', Icons.badge_outlined),
   insurance('insurance', 'Assurance', Icons.verified_user_outlined),
   inspection('inspection', 'Contrôle technique', Icons.fact_check_outlined),
+  technicalDoc('technical_doc', 'Documentation technique', Icons.menu_book_outlined),
   photo('photo', 'Photo', Icons.photo_outlined),
   uncategorized('uncategorized', 'Non classé', Icons.folder_outlined);
 

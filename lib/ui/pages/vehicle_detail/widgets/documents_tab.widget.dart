@@ -118,7 +118,9 @@ class DocumentsTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
-        Text('Factures, photos, carte grise, attestation… (stockés sur kDrive).',
+        Text(
+            'Factures, photos, carte grise, attestation, documentation technique… '
+            '(stockés sur kDrive).',
             style: TextStyle(color: colors.textMuted, fontSize: 13)),
         const SizedBox(height: 12),
         MediaGrid(ownerType: 'vehicle', ownerId: vehicleId),
