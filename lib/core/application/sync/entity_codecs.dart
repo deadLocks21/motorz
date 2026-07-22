@@ -223,7 +223,10 @@ final maintenanceQuoteCodec = SyncCodec<MaintenanceQuote>(
   fromJson: (m) => MaintenanceQuote(
     id: _id(m['id']),
     operationId: _id(m['operation_id']),
-    provider: m['provider'] as String?,
+    // `source` : ancien nom de la colonne. Les lignes déjà en base locale le
+    // portent encore tant qu'elles n'ont pas été réécrites — sans ce repli, le
+    // prestataire d'un devis existant disparaîtrait à la mise à jour de l'app.
+    provider: (m['provider'] ?? m['source']) as String?,
     amount: doubleOrNull(m['amount']),
     isSelected: (m['is_selected'] as bool?) ?? false,
     notes: m['notes'] as String?,
