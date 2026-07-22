@@ -11,10 +11,15 @@
 #      build-windows   .zip autonome du dossier Release (artifact).
 #      build-linux     AppImage x86_64 (artifact).
 #      build-updater   CLI installateur/auto-updater desktop (Win + Linux).
+#      build-web       Image Docker nginx + bundle Flutter web, poussée sur
+#                      Docker Hub en tags immuables (:X.Y.Z, :sha) — l'équivalent
+#                      d'un artifact : publiée mais pas encore servie.
 #   3) build-gate      Sentinelle : vérifie que les builds d'app sont verts.
 #   4) publish-android Upload sur le Play Store, piste "internal".
 #      publish-macos   Upload sur TestFlight (les testeurs internes du groupe
 #                      "Motorz Internal" reçoivent le build automatiquement).
+#      publish-web     Promeut l'image en `:latest` et déclenche docker-updater
+#                      (le VPS ne sert la nouvelle version qu'à partir de là).
 #   5) release         Crée la GitHub Release avec l'AAB + l'APK + le .pkg +
 #                      le .zip Windows + l'AppImage + les 2 binaires updater.
 #
@@ -23,7 +28,12 @@
 # qui met ensuite à jour l'app ET lui-même (cf. tool/updater/README.md). macOS
 # garde son canal store (Mac App Store / TestFlight). build-windows/linux sont
 # dans le gate (atomique) ; build-updater conditionne la release, pas les stores.
-# AUTRES CIBLES (iOS/App Store, Web) : hors pipeline pour l'instant
+# CANAL WEB : self-hosted sur le VPS (`motorz.dtfh.fr`), image Docker publique
+# → docker-updater. Buildé ici, sur le même tag et avec les mêmes
+# `--dart-define` que les binaires store, pour qu'une version publiée désigne
+# partout le même code. Déploiement décrit dans le README (section
+# « Déploiement web »).
+# AUTRES CIBLES (iOS/App Store) : hors pipeline pour l'instant
 # (cf. BRIEF §12 et §13, étape 14 « Élargissement des cibles »).
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
@@ -40,6 +50,16 @@
 #   MAC_INSTALLER_CERTIFICATE_PASSWORD   mot de passe du .p12 installer
 #   SIGNOZ_INGESTION_KEY           clé d'ingestion Signoz (optionnelle — vide =
 #                                  app en ConsoleLogger, pas de remontée Signoz)
+#   DOCKERHUB_TOKEN                access token Docker Hub (canal web)
+#   DEPLOY_URL                     base de l'API docker-updater (canal web)
+#   DEPLOY_TOKEN                   jeton du conteneur côté docker-updater
+#
+# Variables requises (mêmes réglages, onglet « Variables ») :
+#   DOCKERHUB_USERNAME             espace de noms Docker Hub ; l'image publiée
+#                                  est `<DOCKERHUB_USERNAME>/motorz-web`
+#   WEB_API_BASE_URL               (optionnelle) URL d'API figée dans le bundle
+#                                  web. Défaut : https://motorz.dtfh.fr/api
+#   DEPLOY_CONTAINER_NAME          (optionnelle) défaut : motorz-web
 # Les 6 secrets Apple sont account-wide (compte fr.dtfh, déjà utilisés par
 # kidflix/songbook) — recopier les mêmes valeurs, rien à régénérer.
 #
@@ -69,6 +89,11 @@ concurrency:
 env:
   SIGNOZ_INGEST_URL: "https://ingest.eu.signoz.cloud:443/v1/logs"
   SIGNOZ_ENV: "production"
+  # Source unique de la version Flutter : consommée par les jobs store via
+  # `subosito/flutter-action` et par `build-web` via un `--build-arg` (le
+  # Dockerfile compile dans l'image `cirruslabs/flutter`). Les faire diverger
+  # produirait un binaire store et un bundle web compilés différemment.
+  FLUTTER_VERSION: "3.41.7"
 
 jobs:
   prepare:
@@ -120,7 +145,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.41.7"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -232,7 +257,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.41.7"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -390,7 +415,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.41.7"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -471,7 +496,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.41.7"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -594,11 +619,64 @@ jobs:
           if-no-files-found: error
 
   # ═══════════════════════════════════════════════════════════════════════
+  # BUILD WEB — Image Docker (nginx + bundle) poussée en tags immuables
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-web:
+    name: Build Web (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build de l'image et publication en tags immuables
+        # Volontairement **pas** de `:latest` ici : tant que le gate n'est pas
+        # vert, l'image existe sur Docker Hub sans être servie. C'est
+        # l'équivalent de l'artifact des autres cibles.
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # `runtime` explicite : la stage `build` embarque le SDK Flutter et
+          # pèse plusieurs Go, elle ne doit jamais être publiée.
+          target: runtime
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/motorz-web:${{ needs.prepare.outputs.version }}
+            ${{ vars.DOCKERHUB_USERNAME }}/motorz-web:${{ github.sha }}
+          build-args: |
+            FLUTTER_VERSION=${{ env.FLUTTER_VERSION }}
+            API_BASE_URL=${{ vars.WEB_API_BASE_URL || 'https://motorz.dtfh.fr/api' }}
+            BUILD_NAME=${{ needs.prepare.outputs.version }}
+            BUILD_NUMBER=${{ github.run_number }}
+            APP_VERSION=${{ needs.prepare.outputs.version }}+${{ github.run_number }}
+            SIGNOZ_INGEST_URL=${{ env.SIGNOZ_INGEST_URL }}
+            SIGNOZ_INGESTION_KEY=${{ secrets.SIGNOZ_INGESTION_KEY }}
+            SIGNOZ_ENV=${{ env.SIGNOZ_ENV }}
+            BUILD_VERSION=${{ needs.prepare.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          # La compilation Flutter est le poste coûteux du build d'image.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ═══════════════════════════════════════════════════════════════════════
   # BUILD GATE — Sentinelle qui valide que les builds sont verts
   # ═══════════════════════════════════════════════════════════════════════
 
   build-gate:
     name: All builds passed
+    # `build-web` n'y figure pas volontairement, au même titre que
+    # `build-updater` : une indisponibilité de Docker Hub ne doit pas bloquer
+    # une publication store. L'inverse est vrai en revanche — cf. publish-web.
     needs: [build-android, build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 1
@@ -693,6 +771,46 @@ jobs:
             --locale fr-FR \
             --whats-new "$WHATS_NEW" \
             --max-find-build-wait 90
+
+  publish-web:
+    name: Publish Web to VPS
+    # Dépend du gate : le site ne bascule sur la nouvelle version que si tous
+    # les builds d'app étaient verts — une release reste cohérente d'un canal
+    # à l'autre.
+    needs: [prepare, build-gate, build-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/motorz-web
+
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Promouvoir l'image de la version en `:latest`
+        # Re-tag côté registry à partir de l'image déjà poussée par build-web :
+        # aucun rebuild, aucun re-push de couches — et surtout le bit à bit
+        # déployé est exactement celui qui a passé le gate.
+        run: |
+          docker buildx imagetools create \
+            -t "$IMAGE:latest" \
+            "$IMAGE:${{ needs.prepare.outputs.version }}"
+
+      - name: Déclenchement du pull docker-updater
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          CONTAINER: ${{ vars.DEPLOY_CONTAINER_NAME || 'motorz-web' }}
+        run: |
+          curl -fsS --retry 2 --retry-delay 5 -X POST \
+            -F "token=${DEPLOY_TOKEN}" \
+            "${DEPLOY_URL%/}/container/${CONTAINER}/pull/latest"
 
   # ═══════════════════════════════════════════════════════════════════════
   # GITHUB RELEASE — AAB + .pkg attachés, après publishes verts

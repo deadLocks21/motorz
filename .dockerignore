@@ -1,0 +1,41 @@
+# Contexte de build de l'image web. Sans ces exclusions le contexte dépasse
+# 400 Mo (build/ à lui seul en pèse ~370) et chaque build passe des minutes à
+# téléverser des artefacts que la stage Flutter régénère de toute façon.
+
+# Artefacts de build et caches d'outillage
+build/
+.dart_tool/
+.flutter-plugins-dependencies
+*.cache.dill.track.dill
+
+# Outillage CI semantic-release (Node) — sans rapport avec le build web
+node_modules/
+.npm/
+package.json
+package-lock.json
+.releaserc.json
+release_notes*.json
+
+# Plateformes non concernées par la cible web
+android/
+ios/
+macos/
+linux/
+windows/
+
+# Métadonnées de dépôt et d'IDE
+.git/
+.github/
+.gitlab-ci.yml
+.idea/
+.vscode/
+*.iml
+
+# Tests et docs : hors du chemin de build
+test/
+openspec/
+*.md
+
+# Divers
+.DS_Store
+flutter_*.png
