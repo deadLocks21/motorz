@@ -62,6 +62,39 @@ void main() {
     expect(series.last, (month: DateTime(2026, 2), km: 400));
   });
 
+  FuelEntry litres(DateTime date, int odo, double volume, {bool missed = false}) => FuelEntry(
+        id: UuidValue.generate(),
+        vehicleId: vehicleId,
+        date: date,
+        odometer: odo,
+        volumeLiters: volume,
+        missedFillBefore: missed,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+
+  test('un plein manqué coupe la courbe au lieu de la faire mentir', () {
+    final series = StatsService.consumptionSeries([
+      litres(DateTime(2026, 1, 10), 100000, 45),
+      litres(DateTime(2026, 2, 10), 100500, 30),
+      litres(DateTime(2026, 3, 10), 101500, 30, missed: true),
+      litres(DateTime(2026, 4, 10), 102000, 35),
+    ]);
+
+    // Le segment traversé par le plein manqué disparaît ; celui d'après reprend
+    // la mesure, mais détaché du précédent.
+    expect(series.map((p) => p.value), [closeTo(6.0, 0.001), closeTo(7.0, 0.001)]);
+    expect(series.map((p) => p.cutBefore), [false, true]);
+  });
+
+  test('les km parcourus ignorent le plein manqué — le compteur, lui, dit vrai', () {
+    final series = StatsService.kmPerMonth([
+      litres(DateTime(2026, 1, 10), 100000, 45),
+      litres(DateTime(2026, 2, 10), 100500, 30, missed: true),
+    ]);
+
+    expect(series, [(month: DateTime(2026, 2), km: 500)]);
+  });
+
   test('série vide sans plein exploitable', () {
     expect(StatsService.kmPerMonth([]), isEmpty);
     expect(StatsService.kmPerMonth([fuel(DateTime(2026, 1, 10), 100000)]), isEmpty);

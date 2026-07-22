@@ -54,6 +54,43 @@ void main() {
     expect(average.asOf, DateTime.utc(2026, 2, 14));
   });
 
+  FuelEntry missed(int odo, double volume) => FuelEntry(
+        id: UuidValue.generate(),
+        vehicleId: vehicleId,
+        date: DateTime.utc(2026, 1, odo % 27 + 1),
+        odometer: odo,
+        volumeLiters: volume,
+        missedFillBefore: true,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+
+  test('un plein manqué retire tout son segment — les km avec les litres', () {
+    // Véhicule prêté : l'emprunteur a fait un plein sans le dire. Les 30 L
+    // saisis à 101500 sont les seuls connus sur 1000 km, soit 3 L/100 — absurde.
+    final entries = [fuel(100000, 45), fuel(100500, 30), missed(101500, 30)];
+
+    // Sans le drapeau, les litres manquants tirent la moyenne vers le bas.
+    expect(
+      VehicleStatsService.averageConsumption(
+        [fuel(100000, 45), fuel(100500, 30), fuel(101500, 30)],
+      ),
+      closeTo(4.0, 0.001),
+    );
+    // Avec, seul le segment mesuré compte : 30 L sur 500 km.
+    expect(VehicleStatsService.averageConsumption(entries), closeTo(6.0, 0.001));
+  });
+
+  test('un plein sans volume ne dilue pas les litres du segment suivant', () {
+    // Volume oublié à 100500 : ce plein reste une **borne** (sinon les 30 L de
+    // 101000 s'étaleraient sur 1000 km au lieu de 500, soit 3 L/100).
+    final conso = VehicleStatsService.averageConsumption([
+      fuel(100000, 45),
+      fuel(100500, null),
+      fuel(101000, 30),
+    ]);
+    expect(conso, closeTo(6.0, 0.001));
+  });
+
   test('un plein sans date ne prive pas la moyenne de sa date', () {
     // Un plein peut n'avoir qu'un kilométrage : on date alors la moyenne sur le
     // plein daté le plus récent, plutôt que de renoncer à afficher une date.

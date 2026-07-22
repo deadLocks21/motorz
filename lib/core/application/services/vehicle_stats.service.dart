@@ -1,3 +1,4 @@
+import 'package:motorz/core/application/services/stats.service.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/tire_mount.dart';
@@ -29,23 +30,22 @@ abstract final class VehicleStatsService {
     return odos.reduce((a, b) => a > b ? a : b);
   }
 
-  /// Consommation moyenne (L/100 km) sur la plage de km couverte par les pleins
-  /// renseignés en volume, et date du dernier plein retenu — la moyenne est un
-  /// instantané, elle vaut « à cette date ». Approximation assumée (brief §5.3).
+  /// Consommation moyenne (L/100 km) et date du dernier plein retenu — la
+  /// moyenne est un instantané, elle vaut « à cette date ».
+  ///
+  /// Somme des **segments mesurables** (cf. [StatsService.consumptionSegments])
+  /// et non une seule plage du premier au dernier plein : les segments écartés
+  /// (plein manqué, volume absent) sortent des deux côtés de la division, et la
+  /// moyenne redevient la moyenne pondérée exacte des points de la courbe.
   static ConsumptionAverage? consumptionAverage(List<FuelEntry> fuel) {
-    final withVolume = fuel
-        .where((e) => e.volumeLiters != null && e.odometer != null)
-        .toList()
-      ..sort((a, b) => a.odometer!.compareTo(b.odometer!));
-    if (withVolume.length < 2) return null;
-    final distance = withVolume.last.odometer! - withVolume.first.odometer!;
-    if (distance <= 0) return null;
-    // On ne compte pas le volume du premier plein (il a rempli avant la plage).
-    final volume = withVolume.skip(1).fold<double>(0, (s, e) => s + (e.volumeLiters ?? 0));
-    if (volume <= 0) return null;
-    final dates = withVolume.map((e) => e.date).whereType<DateTime>();
+    final segments = StatsService.consumptionSegments(fuel);
+    if (segments.isEmpty) return null;
+    final km = segments.fold<int>(0, (s, seg) => s + seg.km);
+    final liters = segments.fold<double>(0, (s, seg) => s + seg.liters);
+    if (km <= 0 || liters <= 0) return null;
+    final dates = segments.map((seg) => seg.to.date).whereType<DateTime>();
     return (
-      value: volume / distance * 100,
+      value: liters / km * 100,
       asOf: dates.isEmpty ? null : dates.reduce((a, b) => a.isAfter(b) ? a : b),
     );
   }

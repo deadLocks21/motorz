@@ -34,7 +34,11 @@ class StatsPage extends ConsumerWidget {
             subtitle: _averageLabel(average),
             colors: colors,
             child: _LineChart(
-              points: conso,
+              points: [for (final p in conso) (date: p.date, value: p.value)],
+              cutBefore: {
+                for (var i = 0; i < conso.length; i++)
+                  if (conso[i].cutBefore) i,
+              },
               unit: 'L/100',
               color: colors.accent,
               colors: colors,
@@ -120,12 +124,15 @@ class _LineChart extends StatelessWidget {
   const _LineChart({
     required this.points,
     required this.unit,
+    this.cutBefore = const {},
     required this.color,
     required this.colors,
   });
 
   final List<SeriesPoint> points;
   final String unit;
+  /// Index devant lesquels la ligne est rompue (segments non mesurables).
+  final Set<int> cutBefore;
   final Color color;
   final AppColors colors;
 
@@ -219,18 +226,32 @@ class _LineChart extends StatelessWidget {
             ),
           ),
         ),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            color: color,
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.12)),
-          ),
-        ],
+        lineBarsData: _bars(spots),
       ),
     );
+  }
+
+  /// Une barre par tronçon continu. Un segment écarté (plein manqué, cf. §5.3)
+  /// laisse un **trou** dans la courbe : relier les deux bords prétendrait avoir
+  /// mesuré ce qu'on ne sait justement pas. Un tronçon isolé se réduit à un
+  /// point — on rallume donc la pastille, sinon il serait invisible.
+  List<LineChartBarData> _bars(List<FlSpot> spots) {
+    final bars = <LineChartBarData>[];
+    var start = 0;
+    for (var i = 1; i <= spots.length; i++) {
+      if (i < spots.length && !cutBefore.contains(i)) continue;
+      final run = spots.sublist(start, i);
+      bars.add(LineChartBarData(
+        spots: run,
+        isCurved: true,
+        color: color,
+        barWidth: 3,
+        dotData: FlDotData(show: run.length == 1),
+        belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.12)),
+      ));
+      start = i;
+    }
+    return bars;
   }
 }
 

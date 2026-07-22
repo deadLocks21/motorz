@@ -18,6 +18,10 @@ class FuelEntry {
   final FuelType? fuelType;
   final String? station;
   final String? notes;
+  /// Un plein a été fait entre le précédent et celui-ci sans être saisi
+  /// (véhicule prêté, ticket perdu). Les litres manquants rendent le segment
+  /// non mesurable : il sort de la conso, km compris (cf. StatsService).
+  final bool missedFillBefore;
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
@@ -34,6 +38,7 @@ class FuelEntry {
     this.fuelType,
     this.station,
     this.notes,
+    this.missedFillBefore = false,
     this.deletedAt,
   })  : assert(odometer == null || odometer >= 0, 'odometer must be >= 0'),
         assert(date != null || odometer != null,
@@ -48,6 +53,7 @@ class FuelEntry {
     FuelType? fuelType,
     String? station,
     String? notes,
+    bool? missedFillBefore,
     DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
@@ -63,6 +69,7 @@ class FuelEntry {
       fuelType: fuelType ?? this.fuelType,
       station: station ?? this.station,
       notes: notes ?? this.notes,
+      missedFillBefore: missedFillBefore ?? this.missedFillBefore,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

@@ -77,6 +77,12 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
 
   /// Total calculé (volume × prix/L), affiché en lecture seule — jamais saisi.
   double? _total;
+
+  /// Chaîne rompue avant ce plein (cf. FuelEntry.missedFillBefore). Proposé en
+  /// **édition seulement** : un plein manqué se découvre après coup, devant une
+  /// conso incohérente, jamais à la pompe — et le chemin « + Plein » doit rester
+  /// à quinze secondes (§5.8).
+  late bool _missedFillBefore;
   bool _saving = false;
 
   @override
@@ -84,6 +90,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     super.initState();
     final ex = widget.existing;
     _odo = TextEditingController(text: (ex?.odometer ?? widget.lastOdometer)?.toString() ?? '');
+    _missedFillBefore = ex?.missedFillBefore ?? false;
     if (ex != null) {
       // Mode édition : on repart de toutes les valeurs de l'entrée.
       _date = ex.date?.toLocal();
@@ -158,6 +165,7 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
       fuelType: ex?.fuelType ?? widget.defaultFuelType,
       station: _station.text.trim().isEmpty ? null : _station.text.trim(),
       notes: ex?.notes,
+      missedFillBefore: _missedFillBefore,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(fuelRepositoryProvider).save(entry);
@@ -234,7 +242,10 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = widget.existing != null;
     final stations = ref.watch(knownStationsProvider).value ?? const <String>[];
-    return Padding(
+    // Défilable : la feuille est plafonnée en hauteur, et le clavier ouvert lui
+    // reprend encore de la place. Sans ça, le bas du formulaire (enregistrer,
+    // supprimer) déborde au lieu de rester atteignable.
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -310,6 +321,21 @@ class _AddFuelSheetState extends ConsumerState<_AddFuelSheet> {
           ),
           const SizedBox(height: 12),
           _stationField(stations),
+          if (isEditing) ...[
+            const SizedBox(height: 4),
+            SwitchListTile.adaptive(
+              key: const Key('fuelMissedFillSwitch'),
+              value: _missedFillBefore,
+              onChanged: (v) => setState(() => _missedFillBefore = v),
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              title: const Text('Un plein manque avant celui-ci'),
+              subtitle: Text(
+                'Véhicule prêté, ticket perdu — ce trajet sort de la conso.',
+                style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           FilledButton(
             key: const Key('saveFuelButton'),
