@@ -10,6 +10,7 @@ import 'package:motorz/infrastructure/api/vehicle_remote_api.dart';
 import 'package:motorz/infrastructure/auth/dio_auth_repository.dart';
 import 'package:motorz/infrastructure/auth/in_memory_auth_repository.dart';
 import 'package:motorz/infrastructure/connectivity/connectivity_plus.service.dart';
+import 'package:motorz/infrastructure/http/api_endpoint_probe.dart';
 import 'package:motorz/infrastructure/http/auth_interceptor.dart';
 import 'package:motorz/infrastructure/http/http_log.interceptor.dart';
 import 'package:motorz/infrastructure/providers/logger_providers.dart';
@@ -113,6 +114,12 @@ Dio dio(Ref ref) {
   dio.interceptors.add(HttpLogInterceptor(logger: ref.watch(loggerProvider)));
   return dio;
 }
+
+/// Sondeur de base d'API. Client HTTP à part, sans en-tête d'auth (cf.
+/// [ApiEndpointProbe]) : il vise des URL pas encore validées.
+@Riverpod(keepAlive: true)
+ApiEndpointProbe apiEndpointProbe(Ref ref) =>
+    ApiEndpointProbe(logger: ref.watch(loggerProvider));
 
 @Riverpod(keepAlive: true)
 ConnectivityService connectivityService(Ref ref) {

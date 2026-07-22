@@ -210,4 +210,4 @@ final class BootstrapProvider
   }
 }
 
-String _$bootstrapHash() => r'776b831776f32c42c445bc447e7d71c6bc6ab8c1';
+String _$bootstrapHash() => r'c3312825624ce374f4b95834814a5f4960771ad4';

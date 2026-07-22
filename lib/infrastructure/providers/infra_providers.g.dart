@@ -46,7 +46,7 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
   }
 }
 
-String _$apiBaseUrlHash() => r'bcfb3a882284d96d427f0137d51239a2fb4ef28f';
+String _$apiBaseUrlHash() => r'590c606b1b383fe8ef5f3a920f6abdfed9595419';
 
 /// URL de l'API. Dérivée de l'origine sur web, configurable au runtime
 /// (réglages) avec fallback `--dart-define` sur les autres plateformes.
@@ -107,7 +107,61 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'2b6b77f3085216523c92c9c7c50a7b06fddf2c46';
+String _$dioHash() => r'd1b14dee398612766e0d74878ee9cd009968872e';
+
+/// Sondeur de base d'API. Client HTTP à part, sans en-tête d'auth (cf.
+/// [ApiEndpointProbe]) : il vise des URL pas encore validées.
+
+@ProviderFor(apiEndpointProbe)
+final apiEndpointProbeProvider = ApiEndpointProbeProvider._();
+
+/// Sondeur de base d'API. Client HTTP à part, sans en-tête d'auth (cf.
+/// [ApiEndpointProbe]) : il vise des URL pas encore validées.
+
+final class ApiEndpointProbeProvider
+    extends
+        $FunctionalProvider<
+          ApiEndpointProbe,
+          ApiEndpointProbe,
+          ApiEndpointProbe
+        >
+    with $Provider<ApiEndpointProbe> {
+  /// Sondeur de base d'API. Client HTTP à part, sans en-tête d'auth (cf.
+  /// [ApiEndpointProbe]) : il vise des URL pas encore validées.
+  ApiEndpointProbeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'apiEndpointProbeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$apiEndpointProbeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ApiEndpointProbe> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ApiEndpointProbe create(Ref ref) {
+    return apiEndpointProbe(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ApiEndpointProbe value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ApiEndpointProbe>(value),
+    );
+  }
+}
+
+String _$apiEndpointProbeHash() => r'ffb3b116b4f7371e4c05ca3dcc252bd0750688b0';
 
 @ProviderFor(connectivityService)
 final connectivityServiceProvider = ConnectivityServiceProvider._();
