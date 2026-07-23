@@ -1,5 +1,7 @@
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
+import 'package:motorz/core/domain/model/diagnostic_code.dart';
+import 'package:motorz/core/domain/model/diagnostic_session.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
@@ -25,6 +27,16 @@ String _strOr(Object? v, String fallback) {
   final s = v as String?;
   return (s == null || s.trim().isEmpty) ? fallback : s;
 }
+
+/// Colonne jsonb libre (mesures d'un testeur) : recopiée telle quelle, sans
+/// schéma imposé — les testeurs ne rendent pas tous les mêmes grandeurs.
+Map<String, dynamic>? _jsonMap(Object? v) =>
+    v is Map ? Map<String, dynamic>.from(v) : null;
+
+/// Colonne jsonb de chaînes (calculateurs interrogés). Tolère l'absence et les
+/// entrées non-texte d'un rapport mal formé plutôt que de casser la lecture.
+List<String> _stringList(Object? v) =>
+    v is List ? v.whereType<Object>().map((e) => e.toString()).toList() : const [];
 
 final vehicleCodec = SyncCodec<Vehicle>(
   resource: 'vehicles',
@@ -388,6 +400,88 @@ final tireMountCodec = SyncCodec<TireMount>(
     'mounted_date': e.mountedDate,
     'dismounted_odometer': e.dismountedOdometer,
     'dismounted_date': e.dismountedDate,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+final diagnosticSessionCodec = SyncCodec<DiagnosticSession>(
+  resource: 'diagnostic_sessions',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => e.vehicleId.value,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => DiagnosticSession(
+    id: _id(m['id']),
+    vehicleId: _id(m['vehicle_id']),
+    createdByUserId: _idN(m['created_by_user_id']),
+    date: parseDate(m['date']),
+    odometer: intOrNull(m['odometer']),
+    type: DiagnosticType.fromWire(m['type'] as String?),
+    tool: m['tool'] as String?,
+    connectionProfile: m['connection_profile'] as String?,
+    source: DiagnosticSource.fromWire(m['source'] as String?),
+    sourceUrl: m['source_url'] as String?,
+    rawText: m['raw_text'] as String?,
+    analyzedAt: parseDateOrNull(m['analyzed_at']),
+    summary: m['summary'] as String?,
+    measurements: _jsonMap(m['measurements']),
+    modulesScanned: _stringList(m['modules_scanned']),
+    notes: m['notes'] as String?,
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'vehicle_id': e.vehicleId.value,
+    'created_by_user_id': e.createdByUserId?.value,
+    'date': e.date.toUtc().toIso8601String(),
+    'odometer': e.odometer,
+    'type': e.type.wire,
+    'tool': e.tool,
+    'connection_profile': e.connectionProfile,
+    'source': e.source.wire,
+    'source_url': e.sourceUrl,
+    'raw_text': e.rawText,
+    'analyzed_at': isoOrNull(e.analyzedAt),
+    'summary': e.summary,
+    'measurements': e.measurements,
+    // Liste vide plutôt que `null` : « aucun module retenu » et « champ absent »
+    // se lisent pareil côté état des codes, autant n'avoir qu'une forme.
+    'modules_scanned': e.modulesScanned,
+    'notes': e.notes,
+    'updated_at': isoOrNull(e.updatedAt),
+    'deleted_at': isoOrNull(e.deletedAt),
+  },
+);
+
+// Codes : scopés par session_id (pas de vehicle_id → vehicleIdOf null, résolu
+// via la session parente, comme les lignes d'opération).
+final diagnosticCodeCodec = SyncCodec<DiagnosticCode>(
+  resource: 'diagnostic_codes',
+  idOf: (e) => e.id.value,
+  vehicleIdOf: (e) => null,
+  updatedAtOf: (e) => e.updatedAt,
+  deletedAtOf: (e) => e.deletedAt,
+  fromJson: (m) => DiagnosticCode(
+    id: _id(m['id']),
+    sessionId: _id(m['session_id']),
+    code: _strOr(m['code'], '?'),
+    module: m['module'] as String?,
+    description: m['description'] as String?,
+    status: DiagnosticCodeStatus.fromWire(m['status'] as String?),
+    rawStatus: m['raw_status'] as String?,
+    updatedAt: parseDate(m['updated_at']),
+    deletedAt: parseDateOrNull(m['deleted_at']),
+  ),
+  toJson: (e) => {
+    'id': e.id.value,
+    'session_id': e.sessionId.value,
+    'code': e.code,
+    'module': e.module,
+    'description': e.description,
+    'status': e.status.wire,
+    'raw_status': e.rawStatus,
     'updated_at': isoOrNull(e.updatedAt),
     'deleted_at': isoOrNull(e.deletedAt),
   },

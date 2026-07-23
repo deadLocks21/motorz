@@ -44,6 +44,25 @@ class MediaRemoteApi {
     }
   }
 
+  /// Texte brut d'un rapport PDF déjà uploadé (`/media/:id/text`).
+  ///
+  /// L'API ne fait que `PDF → texte` : l'analyse reste côté app, avec le même
+  /// analyseur que pour un rapport collé. Renvoie `null` si le PDF n'a pas de
+  /// couche texte (scan) — pas d'OCR, la saisie manuelle prend le relais.
+  /// En ligne uniquement : hors réseau, le document reste joint et la session
+  /// reste « à analyser ».
+  Future<String?> extractText(String id) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/media/$id/text');
+      final data = res.data!;
+      if (data['empty'] == true) return null;
+      return data['text'] as String?;
+    } catch (e, st) {
+      _logger?.error('media.extract_text.failed', error: e, stack: st);
+      rethrow;
+    }
+  }
+
   /// Télécharge les octets bruts d'un média via le proxy authentifié `/media/:id`.
   Future<Uint8List> download(String id) async {
     try {

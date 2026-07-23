@@ -12,24 +12,31 @@ import 'package:motorz/infrastructure/providers/repository_providers.dart';
 /// - **Tâche ponctuelle** : à faire une fois (ex. changer un rétroviseur), sans
 ///   périodicité, cible date/km optionnelle ; **disparaît une fois faite** (une
 ///   opération du même intitulé). Peut être recréée plus tard.
+///
+/// [prefilledTitle] sert aux créations amorcées ailleurs — typiquement « prévoir
+/// la réparation » depuis un code défaut (§5.11) : le titre arrive rempli, tout
+/// le reste se saisit normalement.
 Future<void> showPlanSheet(
   BuildContext context,
   WidgetRef ref, {
   required String vehicleId,
   Plan? existing,
+  String? prefilledTitle,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _PlanSheet(vehicleId: vehicleId, existing: existing),
+    builder: (_) =>
+        _PlanSheet(vehicleId: vehicleId, existing: existing, prefilledTitle: prefilledTitle),
   );
 }
 
 class _PlanSheet extends ConsumerStatefulWidget {
-  const _PlanSheet({required this.vehicleId, this.existing});
+  const _PlanSheet({required this.vehicleId, this.existing, this.prefilledTitle});
   final String vehicleId;
   final Plan? existing;
+  final String? prefilledTitle;
 
   @override
   ConsumerState<_PlanSheet> createState() => _PlanSheetState();
@@ -49,7 +56,7 @@ class _PlanSheetState extends ConsumerState<_PlanSheet> {
     super.initState();
     final e = widget.existing;
     _oneShot = e != null ? !e.isRecurring : true;
-    _title = TextEditingController(text: e?.title ?? '');
+    _title = TextEditingController(text: e?.title ?? widget.prefilledTitle ?? '');
     _intervalKm = TextEditingController(text: e?.intervalKm?.toString() ?? '');
     _intervalMonths = TextEditingController(text: e?.intervalMonths?.toString() ?? '');
     _dueOdometer = TextEditingController(text: e?.dueOdometer?.toString() ?? '');

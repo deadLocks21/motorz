@@ -1,5 +1,7 @@
 import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
+import 'package:motorz/core/domain/model/diagnostic_code.dart';
+import 'package:motorz/core/domain/model/diagnostic_session.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
@@ -64,6 +66,12 @@ class DemoSeed {
     }
     for (final m in _tireMounts(vehicleId)) {
       await _put(tireMountCodec, m);
+    }
+    for (final s in _diagnosticSessions(vehicleId)) {
+      await _put(diagnosticSessionCodec, s);
+    }
+    for (final c in _diagnosticCodes()) {
+      await _put(diagnosticCodeCodec, c);
     }
   }
 
@@ -393,6 +401,91 @@ class DemoSeed {
       m('0006', '0006', 'ARD', 10400, '2025-11-05'),
       // Galette au secours.
       m('0007', '0007', 'SEC', 50, '2024-03-15'),
+    ];
+  }
+
+  /// Trois relevés qui racontent l'essentiel du §5.11 : un défaut moteur relevé
+  /// puis **disparu** après réparation, un défaut ABS **encore actif**, et un
+  /// test de batterie dont les mesures viennent d'un lien décodé.
+  List<DiagnosticSession> _diagnosticSessions(UuidValue vehicleId) => [
+        DiagnosticSession(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d0001'),
+          vehicleId: vehicleId,
+          date: DateTime.utc(2026, 1, 10, 18, 30),
+          odometer: 11200,
+          tool: 'Car Scanner ELM OBD2 1.118.0',
+          connectionProfile: 'Ford OBD-II / EOBD',
+          source: DiagnosticSource.pasted,
+          analyzedAt: DateTime.utc(2026, 1, 10, 18, 32),
+          modulesScanned: const ['OBD-II', 'Unité de contrôle moteur#1', 'ABS'],
+          updatedAt: _seedAt,
+        ),
+        DiagnosticSession(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d0002'),
+          vehicleId: vehicleId,
+          date: DateTime.utc(2026, 3, 14, 10, 15),
+          odometer: 11950,
+          tool: 'Car Scanner ELM OBD2 1.118.0',
+          connectionProfile: 'Ford OBD-II / EOBD',
+          source: DiagnosticSource.pasted,
+          analyzedAt: DateTime.utc(2026, 3, 14, 10, 17),
+          modulesScanned: const ['OBD-II', 'Unité de contrôle moteur#1', 'ABS'],
+          notes: 'Bougies changées en février : plus de raté d\'allumage.',
+          updatedAt: _seedAt,
+        ),
+        DiagnosticSession(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d0003'),
+          vehicleId: vehicleId,
+          date: DateTime.utc(2026, 5, 18, 9, 40),
+          odometer: 12480,
+          type: DiagnosticType.battery,
+          source: DiagnosticSource.link,
+          sourceUrl: 'https://e.dh5z.com/?d=10760127308670110010000337200000000000000000000000041',
+          analyzedAt: DateTime.utc(2026, 5, 18, 9, 41),
+          summary: 'Bonne batterie',
+          measurements: const {
+            'battery_type': 'Normal',
+            'rated': 760,
+            'voltage': 12.73,
+            'measured': 867,
+            'standard': 'CCA',
+            'result': 'Bonne batterie',
+            'soc': 100,
+            'soh': 100,
+            'internal_mohm': 3.37,
+            'vehicle_type': 'Voiture',
+          },
+          updatedAt: _seedAt,
+        ),
+      ];
+
+  /// Le raté d'allumage remonte sur deux calculateurs (comme le fait un vrai
+  /// scanner) : deux lignes, **un** défaut à l'écran.
+  List<DiagnosticCode> _diagnosticCodes() {
+    DiagnosticCode c(
+      String suffix,
+      String sessionSuffix,
+      String code,
+      String module,
+      String description,
+    ) =>
+        DiagnosticCode(
+          id: UuidValue.parse('0a5c0000-0000-4000-8000-0000000e$suffix'),
+          sessionId: UuidValue.parse('0a5c0000-0000-4000-8000-0000000d$sessionSuffix'),
+          code: code,
+          module: module,
+          description: description,
+          status: DiagnosticCodeStatus.confirmed,
+          rawStatus: 'Défaut présent',
+          updatedAt: _seedAt,
+        );
+
+    return [
+      // Relevé de janvier : raté d'allumage, vu par l'OBD et par le moteur.
+      c('0001', '0001', 'P0301', 'OBD-II', 'Cylinder 1 misfire detected'),
+      c('0002', '0001', 'P0301', 'Unité de contrôle moteur#1', 'Cylinder 1 misfire detected'),
+      // Relevé de mars : le moteur est propre (P0301 disparu), mais l'ABS parle.
+      c('0003', '0002', 'C0035', 'ABS', 'Left front wheel speed sensor circuit'),
     ];
   }
 }

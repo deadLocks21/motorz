@@ -598,6 +598,106 @@ final class MaintenanceQuoteRepositoryProvider
 String _$maintenanceQuoteRepositoryHash() =>
     r'bf1378638b89f0e05092ba8970719d264ac0c3ce';
 
+@ProviderFor(diagnosticSessionRepository)
+final diagnosticSessionRepositoryProvider =
+    DiagnosticSessionRepositoryProvider._();
+
+final class DiagnosticSessionRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<DiagnosticSession>,
+          SyncableRepository<DiagnosticSession>,
+          SyncableRepository<DiagnosticSession>
+        >
+    with $Provider<SyncableRepository<DiagnosticSession>> {
+  DiagnosticSessionRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'diagnosticSessionRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$diagnosticSessionRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<DiagnosticSession>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<DiagnosticSession> create(Ref ref) {
+    return diagnosticSessionRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<DiagnosticSession> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride:
+          $SyncValueProvider<SyncableRepository<DiagnosticSession>>(value),
+    );
+  }
+}
+
+String _$diagnosticSessionRepositoryHash() =>
+    r'b94136c4c3eb6938c4a836ab506d9bf355ecb37b';
+
+@ProviderFor(diagnosticCodeRepository)
+final diagnosticCodeRepositoryProvider = DiagnosticCodeRepositoryProvider._();
+
+final class DiagnosticCodeRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SyncableRepository<DiagnosticCode>,
+          SyncableRepository<DiagnosticCode>,
+          SyncableRepository<DiagnosticCode>
+        >
+    with $Provider<SyncableRepository<DiagnosticCode>> {
+  DiagnosticCodeRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'diagnosticCodeRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$diagnosticCodeRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncableRepository<DiagnosticCode>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SyncableRepository<DiagnosticCode> create(Ref ref) {
+    return diagnosticCodeRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncableRepository<DiagnosticCode> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncableRepository<DiagnosticCode>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$diagnosticCodeRepositoryHash() =>
+    r'0cca0e5de3a27321a13cd3da078bda1a852ed086';
+
 @ProviderFor(mediaRepository)
 final mediaRepositoryProvider = MediaRepositoryProvider._();
 

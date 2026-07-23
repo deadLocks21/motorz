@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:motorz/core/application/services/diagnostic.service.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/finance.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
+import 'package:motorz/core/domain/model/diagnostic_code.dart';
+import 'package:motorz/core/domain/model/diagnostic_session.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
@@ -406,6 +409,52 @@ Future<List<MaintenanceQuote>> quotesForOperation(Ref ref, String operationId) a
   ref.watch(storeChangesProvider);
   final all = await ref.watch(maintenanceQuoteRepositoryProvider).listAll();
   return all.where((q) => q.operationId.value == operationId).toList();
+}
+
+// ── Diagnostics (OBD & batterie) ────────────────────────────────────────────
+
+/// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+@riverpod
+Future<List<DiagnosticSession>> diagnosticSessions(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  final list = await ref.watch(diagnosticSessionRepositoryProvider).listForVehicle(vehicleId);
+  list.sort((a, b) => b.date.compareTo(a.date));
+  return list;
+}
+
+/// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+/// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+@riverpod
+Future<List<DiagnosticCode>> codesForSession(Ref ref, String sessionId) async {
+  ref.watch(storeChangesProvider);
+  final all = await ref.watch(diagnosticCodeRepositoryProvider).listAll();
+  return all.where((c) => c.sessionId.value == sessionId).toList();
+}
+
+/// Tous les codes du véhicule, toutes sessions confondues.
+@riverpod
+Future<List<DiagnosticCode>> codesForVehicle(Ref ref, String vehicleId) async {
+  ref.watch(storeChangesProvider);
+  final sessions = await ref.watch(diagnosticSessionsProvider(vehicleId).future);
+  final sessionIds = sessions.map((s) => s.id.value).toSet();
+  final all = await ref.watch(diagnosticCodeRepositoryProvider).listAll();
+  return all.where((c) => sessionIds.contains(c.sessionId.value)).toList();
+}
+
+/// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+/// dérivée de l'historique des sessions.
+@riverpod
+Future<List<CodeHistory>> diagnosticHistory(Ref ref, String vehicleId) async {
+  final sessions = await ref.watch(diagnosticSessionsProvider(vehicleId).future);
+  final codes = await ref.watch(codesForVehicleProvider(vehicleId).future);
+  return DiagnosticService.history(sessions, codes);
+}
+
+/// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+@riverpod
+Future<List<CodeHistory>> activeDiagnosticCodes(Ref ref, String vehicleId) async {
+  final all = await ref.watch(diagnosticHistoryProvider(vehicleId).future);
+  return all.where((h) => h.isActive).toList();
 }
 
 /// Documents (photos/PDF) rattachés à une cible (véhicule, plein, opération…).

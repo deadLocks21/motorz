@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:motorz/core/application/services/diagnostic.service.dart';
 import 'package:motorz/core/application/services/due_status.service.dart';
 import 'package:motorz/core/application/services/maintenance_derivation.service.dart';
 import 'package:motorz/core/application/services/tire.service.dart';
 import 'package:motorz/core/application/services/vehicle_stats.service.dart';
+import 'package:motorz/core/domain/model/diagnostic_code.dart';
+import 'package:motorz/core/domain/model/diagnostic_session.dart';
 import 'package:motorz/core/domain/model/enums.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
 import 'package:motorz/core/domain/model/target_pressure.dart';
 import 'package:motorz/core/domain/model/tire_pressure_entry.dart';
 import 'package:motorz/core/domain/model/vehicle.dart';
 import 'package:motorz/infrastructure/providers/session_providers.dart';
+import 'package:motorz/ui/pages/diagnostic_detail/diagnostic_detail.page.dart';
+import 'package:motorz/ui/pages/vehicle_detail/widgets/add_diagnostic_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_fuel_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_operation_sheet.widget.dart';
 import 'package:motorz/ui/pages/vehicle_detail/widgets/add_plan_sheet.widget.dart';
@@ -80,6 +85,7 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
     'À prévoir',
     'Pneus',
     'Pressions',
+    'Diagnostics',
     'Docs',
   ];
 
@@ -115,6 +121,8 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
         await showAddTireSheet(context, ref,
             vehicleId: _id, wheelCount: widget.vehicle.wheelCount, lastOdometer: odo);
       case 6:
+        await showDiagnosticSheet(context, ref, vehicleId: _id, lastOdometer: odo);
+      case 7:
         await uploadDocument(context, ref, ownerType: 'vehicle', ownerId: _id);
       default:
         await showAddFuelSheet(context, ref,
@@ -153,6 +161,7 @@ class _VehicleDetailViewState extends ConsumerState<_VehicleDetailView>
           _TasksTab(vehicleId: _id),
           _TiresTab(vehicle: v),
           _PressuresTab(vehicle: v),
+          _DiagnosticsTab(vehicleId: _id),
           DocumentsTab(vehicleId: _id),
         ],
       ),
@@ -176,10 +185,17 @@ class _OverviewTab extends ConsumerWidget {
     final fuel = ref.watch(fuelEntriesProvider(id)).value ?? const [];
     final due = ref.watch(duePlansProvider(id)).value ?? const [];
     final upcoming = due.where((d) => d.due.hasTrigger).take(3).toList();
+    final activeCodes = ref.watch(activeDiagnosticCodesProvider(id)).value ?? const [];
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Un défaut OBD actif est un constat, pas une échéance : il n'a ni date
+        // ni km cible, seulement un « ça cloche, et depuis quand » (§5.10).
+        if (activeCodes.isNotEmpty) ...[
+          _ActiveFaultsBanner(codes: activeCodes, colors: colors),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             Expanded(child: _StatTile(label: 'Km courant', value: formatKm(odo), colors: colors)),
@@ -247,6 +263,48 @@ class _OverviewTab extends ConsumerWidget {
     );
   }
 
+}
+
+/// Bandeau « défauts actifs » : ce que le dernier diagnostic laisse en suspens.
+class _ActiveFaultsBanner extends StatelessWidget {
+  const _ActiveFaultsBanner({required this.codes, required this.colors});
+  final List<CodeHistory> codes;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final since = codes.map((c) => c.firstSeen).reduce((a, b) => a.isBefore(b) ? a : b);
+    return Card(
+      color: colors.statusOverdue.withValues(alpha: 0.10),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: colors.statusOverdue),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${codes.length} défaut${codes.length > 1 ? 's' : ''} actif'
+                    '${codes.length > 1 ? 's' : ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${codes.take(3).map((c) => c.code).join(', ')}'
+                    '${codes.length > 3 ? '…' : ''} · depuis le ${formatDate(since)}',
+                    style: TextStyle(color: colors.textMuted, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Carte « Identité » : en première instance, les identifiants qu'on copie le
@@ -560,6 +618,128 @@ class _MaintenanceTab extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Diagnostics : les défauts encore actifs en tête (ce qui cloche *maintenant*),
+/// puis l'historique des relevés (§5.11).
+class _DiagnosticsTab extends ConsumerWidget {
+  const _DiagnosticsTab({required this.vehicleId});
+  final String vehicleId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final async = ref.watch(diagnosticSessionsProvider(vehicleId));
+    final active = ref.watch(activeDiagnosticCodesProvider(vehicleId)).value ?? const [];
+    final codes = ref.watch(codesForVehicleProvider(vehicleId)).value ?? const <DiagnosticCode>[];
+
+    return async.when(
+      skipLoadingOnReload: true,
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Erreur : $e')),
+      data: (sessions) {
+        if (sessions.isEmpty) {
+          return const _EmptyTab(
+            'Aucun diagnostic. Touche + pour coller un rapport de valise ou '
+            'un lien de testeur de batterie.',
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+          children: [
+            if (active.isNotEmpty) ...[
+              Text('Défauts actifs (${active.length})',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...active.map((h) => _ActiveCodeRow(history: h, colors: colors)),
+              const SizedBox(height: 20),
+              Text('Relevés', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+            ],
+            ...sessions.map((s) {
+              final sessionCodes = DiagnosticService.groupBySession(
+                codes.where((c) => c.sessionId == s.id),
+              );
+              return EntryCard(
+                icon: s.type == DiagnosticType.battery
+                    ? Icons.battery_charging_full
+                    : Icons.troubleshoot,
+                iconColor: colors.accent,
+                title: s.summary ?? s.type.label,
+                subtitle: [
+                  formatDate(s.date),
+                  if (s.odometer != null) formatKm(s.odometer),
+                  if (s.tool != null) s.tool!,
+                ].join(' · '),
+                // Tant qu'un relevé OBD n'est pas analysé, on ne prétend pas
+                // qu'il porte « 0 défaut » : un PDF joint mais pas dépouillé
+                // n'est pas un véhicule sain.
+                trailing: s.type == DiagnosticType.obd && s.analyzedAt == null
+                    ? Icon(Icons.hourglass_empty, size: 18, color: colors.textMuted)
+                    : Text(
+                        s.type == DiagnosticType.battery
+                            ? ''
+                            : '${sessionCodes.length} défaut${sessionCodes.length > 1 ? 's' : ''}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: sessionCodes.isEmpty ? colors.statusOk : colors.statusOverdue,
+                        ),
+                      ),
+                showChevron: true,
+                colors: colors,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => DiagnosticDetailPage(session: s)),
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Un défaut encore actif : le code, son état, et depuis quand.
+class _ActiveCodeRow extends StatelessWidget {
+  const _ActiveCodeRow({required this.history, required this.colors});
+  final CodeHistory history;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final unverified = history.state == CodeState.unverified;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(
+              unverified ? Icons.help_outline : Icons.error_outline,
+              color: unverified ? colors.statusSoon : colors.statusOverdue,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${history.code}${history.description == null ? '' : ' — ${history.description}'}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${history.state.label} · vu le ${formatDate(history.lastSeen)}',
+                    style: TextStyle(color: colors.textMuted, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:motorz/core/application/sync/entity_codecs.dart';
 import 'package:motorz/core/application/sync/sync_codec.dart';
 import 'package:motorz/core/domain/model/cost_entry.dart';
+import 'package:motorz/core/domain/model/diagnostic_code.dart';
+import 'package:motorz/core/domain/model/diagnostic_session.dart';
 import 'package:motorz/core/domain/model/fuel_entry.dart';
 import 'package:motorz/core/domain/model/maintenance_operation.dart';
 import 'package:motorz/core/domain/model/maintenance_operation_line.dart';
@@ -67,6 +69,14 @@ SyncableRepository<CostEntry> costEntryRepository(Ref ref) => _build(ref, costEn
 @riverpod
 SyncableRepository<MaintenanceQuote> maintenanceQuoteRepository(Ref ref) =>
     _build(ref, maintenanceQuoteCodec);
+
+@riverpod
+SyncableRepository<DiagnosticSession> diagnosticSessionRepository(Ref ref) =>
+    _build(ref, diagnosticSessionCodec);
+
+@riverpod
+SyncableRepository<DiagnosticCode> diagnosticCodeRepository(Ref ref) =>
+    _build(ref, diagnosticCodeCodec);
 
 @riverpod
 SyncableRepository<MediaItem> mediaRepository(Ref ref) => _build(ref, mediaItemCodec);

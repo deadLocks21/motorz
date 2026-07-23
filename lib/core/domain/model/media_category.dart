@@ -9,6 +9,7 @@ enum MediaCategory {
   insurance('insurance', 'Assurance', Icons.verified_user_outlined),
   inspection('inspection', 'Contrôle technique', Icons.fact_check_outlined),
   technicalDoc('technical_doc', 'Documentation technique', Icons.menu_book_outlined),
+  diagnosticReport('diagnostic_report', 'Rapport de diagnostic', Icons.troubleshoot_outlined),
   photo('photo', 'Photo', Icons.photo_outlined),
   uncategorized('uncategorized', 'Non classé', Icons.folder_outlined);
 
@@ -30,6 +31,8 @@ enum MediaCategory {
     switch (ownerType) {
       case 'maintenance_quote':
         return quote;
+      case 'diagnostic_session':
+        return diagnosticReport;
       case 'maintenance_operation':
       case 'fuel_entry':
         return invoice;

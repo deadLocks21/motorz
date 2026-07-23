@@ -1553,6 +1553,448 @@ final class QuotesForOperationFamily extends $Family
   String toString() => r'quotesForOperationProvider';
 }
 
+/// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+
+@ProviderFor(diagnosticSessions)
+final diagnosticSessionsProvider = DiagnosticSessionsFamily._();
+
+/// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+
+final class DiagnosticSessionsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<DiagnosticSession>>,
+          List<DiagnosticSession>,
+          FutureOr<List<DiagnosticSession>>
+        >
+    with
+        $FutureModifier<List<DiagnosticSession>>,
+        $FutureProvider<List<DiagnosticSession>> {
+  /// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+  DiagnosticSessionsProvider._({
+    required DiagnosticSessionsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'diagnosticSessionsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$diagnosticSessionsHash();
+
+  @override
+  String toString() {
+    return r'diagnosticSessionsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<DiagnosticSession>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<DiagnosticSession>> create(Ref ref) {
+    final argument = this.argument as String;
+    return diagnosticSessions(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DiagnosticSessionsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$diagnosticSessionsHash() =>
+    r'ff8230de20b289de58efc8430f23b196fc406e21';
+
+/// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+
+final class DiagnosticSessionsFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<DiagnosticSession>>, String> {
+  DiagnosticSessionsFamily._()
+    : super(
+        retry: null,
+        name: r'diagnosticSessionsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Sessions de diagnostic d'un véhicule, de la plus récente à la plus ancienne.
+
+  DiagnosticSessionsProvider call(String vehicleId) =>
+      DiagnosticSessionsProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'diagnosticSessionsProvider';
+}
+
+/// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+/// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+
+@ProviderFor(codesForSession)
+final codesForSessionProvider = CodesForSessionFamily._();
+
+/// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+/// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+
+final class CodesForSessionProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<DiagnosticCode>>,
+          List<DiagnosticCode>,
+          FutureOr<List<DiagnosticCode>>
+        >
+    with
+        $FutureModifier<List<DiagnosticCode>>,
+        $FutureProvider<List<DiagnosticCode>> {
+  /// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+  /// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+  CodesForSessionProvider._({
+    required CodesForSessionFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'codesForSessionProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$codesForSessionHash();
+
+  @override
+  String toString() {
+    return r'codesForSessionProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<DiagnosticCode>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<DiagnosticCode>> create(Ref ref) {
+    final argument = this.argument as String;
+    return codesForSession(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CodesForSessionProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$codesForSessionHash() => r'907c2eaf32fec6bcd35c1b64efd12d4a12dced30';
+
+/// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+/// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+
+final class CodesForSessionFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<DiagnosticCode>>, String> {
+  CodesForSessionFamily._()
+    : super(
+        retry: null,
+        name: r'codesForSessionProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Codes défaut d'une session (bruts : un par calculateur ayant remonté le
+  /// code — cf. [DiagnosticService.groupBySession] pour l'affichage).
+
+  CodesForSessionProvider call(String sessionId) =>
+      CodesForSessionProvider._(argument: sessionId, from: this);
+
+  @override
+  String toString() => r'codesForSessionProvider';
+}
+
+/// Tous les codes du véhicule, toutes sessions confondues.
+
+@ProviderFor(codesForVehicle)
+final codesForVehicleProvider = CodesForVehicleFamily._();
+
+/// Tous les codes du véhicule, toutes sessions confondues.
+
+final class CodesForVehicleProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<DiagnosticCode>>,
+          List<DiagnosticCode>,
+          FutureOr<List<DiagnosticCode>>
+        >
+    with
+        $FutureModifier<List<DiagnosticCode>>,
+        $FutureProvider<List<DiagnosticCode>> {
+  /// Tous les codes du véhicule, toutes sessions confondues.
+  CodesForVehicleProvider._({
+    required CodesForVehicleFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'codesForVehicleProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$codesForVehicleHash();
+
+  @override
+  String toString() {
+    return r'codesForVehicleProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<DiagnosticCode>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<DiagnosticCode>> create(Ref ref) {
+    final argument = this.argument as String;
+    return codesForVehicle(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CodesForVehicleProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$codesForVehicleHash() => r'd3f74bdb18456fedd46e520016acef0d5f9b94fa';
+
+/// Tous les codes du véhicule, toutes sessions confondues.
+
+final class CodesForVehicleFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<DiagnosticCode>>, String> {
+  CodesForVehicleFamily._()
+    : super(
+        retry: null,
+        name: r'codesForVehicleProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Tous les codes du véhicule, toutes sessions confondues.
+
+  CodesForVehicleProvider call(String vehicleId) =>
+      CodesForVehicleProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'codesForVehicleProvider';
+}
+
+/// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+/// dérivée de l'historique des sessions.
+
+@ProviderFor(diagnosticHistory)
+final diagnosticHistoryProvider = DiagnosticHistoryFamily._();
+
+/// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+/// dérivée de l'historique des sessions.
+
+final class DiagnosticHistoryProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<CodeHistory>>,
+          List<CodeHistory>,
+          FutureOr<List<CodeHistory>>
+        >
+    with
+        $FutureModifier<List<CodeHistory>>,
+        $FutureProvider<List<CodeHistory>> {
+  /// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+  /// dérivée de l'historique des sessions.
+  DiagnosticHistoryProvider._({
+    required DiagnosticHistoryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'diagnosticHistoryProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$diagnosticHistoryHash();
+
+  @override
+  String toString() {
+    return r'diagnosticHistoryProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<CodeHistory>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<CodeHistory>> create(Ref ref) {
+    final argument = this.argument as String;
+    return diagnosticHistory(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DiagnosticHistoryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$diagnosticHistoryHash() => r'94e52e7ad23158af375664baaf2e23b5f1c3bf26';
+
+/// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+/// dérivée de l'historique des sessions.
+
+final class DiagnosticHistoryFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<CodeHistory>>, String> {
+  DiagnosticHistoryFamily._()
+    : super(
+        retry: null,
+        name: r'diagnosticHistoryProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Histoire de chaque code du véhicule (actif / non revérifié / disparu),
+  /// dérivée de l'historique des sessions.
+
+  DiagnosticHistoryProvider call(String vehicleId) =>
+      DiagnosticHistoryProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'diagnosticHistoryProvider';
+}
+
+/// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+
+@ProviderFor(activeDiagnosticCodes)
+final activeDiagnosticCodesProvider = ActiveDiagnosticCodesFamily._();
+
+/// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+
+final class ActiveDiagnosticCodesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<CodeHistory>>,
+          List<CodeHistory>,
+          FutureOr<List<CodeHistory>>
+        >
+    with
+        $FutureModifier<List<CodeHistory>>,
+        $FutureProvider<List<CodeHistory>> {
+  /// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+  ActiveDiagnosticCodesProvider._({
+    required ActiveDiagnosticCodesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'activeDiagnosticCodesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$activeDiagnosticCodesHash();
+
+  @override
+  String toString() {
+    return r'activeDiagnosticCodesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<CodeHistory>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<CodeHistory>> create(Ref ref) {
+    final argument = this.argument as String;
+    return activeDiagnosticCodes(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ActiveDiagnosticCodesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$activeDiagnosticCodesHash() =>
+    r'd82323c24d5f1ba5df5aa99154c48b12a64e51f5';
+
+/// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+
+final class ActiveDiagnosticCodesFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<List<CodeHistory>>, String> {
+  ActiveDiagnosticCodesFamily._()
+    : super(
+        retry: null,
+        name: r'activeDiagnosticCodesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Défauts encore actifs — l'indicateur in-app du véhicule (§5.10).
+
+  ActiveDiagnosticCodesProvider call(String vehicleId) =>
+      ActiveDiagnosticCodesProvider._(argument: vehicleId, from: this);
+
+  @override
+  String toString() => r'activeDiagnosticCodesProvider';
+}
+
 /// Documents (photos/PDF) rattachés à une cible (véhicule, plein, opération…).
 
 @ProviderFor(mediaForOwner)
